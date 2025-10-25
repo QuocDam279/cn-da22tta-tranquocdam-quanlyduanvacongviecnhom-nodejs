@@ -21,7 +21,7 @@ userSchema.pre('save', async function(next) {
 });
 
 // Phương thức để so sánh mật khẩu
-userSchema.metthods.comparePassword = function(password) {
+userSchema.methods.comparePassword = function(password) {
     return bcrypt.compare(password, this.password);
 };
 
