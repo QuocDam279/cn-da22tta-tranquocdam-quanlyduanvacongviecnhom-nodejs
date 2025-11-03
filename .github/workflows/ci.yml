@@ -21,24 +21,32 @@ jobs:
 
       - name: 🔍 Detect changed folders
         id: filter
+        shell: bash
         run: |
           echo "🔍 Detecting changed services..."
+
+          # Nếu không có base_ref (ví dụ push lần đầu)
           BASE=${{ github.base_ref }}
           HEAD=${{ github.head_ref }}
 
-          # Nếu là push trực tiếp (không phải PR)
           if [ -z "$BASE" ]; then
-            BASE=HEAD~1
-            HEAD=HEAD
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              BASE="HEAD~1"
+            else
+              BASE=$(git rev-list --max-parents=0 HEAD) # commit đầu tiên
+            fi
+            HEAD="HEAD"
           fi
 
+          echo "Comparing $BASE..$HEAD"
           CHANGED=$(git diff --name-only $BASE..$HEAD || echo "")
+
           echo "Changed files:"
           echo "$CHANGED"
 
           SERVICES=()
 
-          # Kiểm tra thay đổi trong từng service
+          # Kiểm tra thay đổi trong từng service backend
           for folder in services/*; do
             svc=$(basename "$folder")
             if echo "$CHANGED" | grep -q "$svc/"; then
@@ -56,9 +64,11 @@ jobs:
             SERVICES=("api-gateway" "auth-service" "team-service" "frontend")
           fi
 
-          JSON_ARRAY=$(printf '%s\n' "${SERVICES[@]}" | jq -R . | jq -s .)
+          # JSON hợp lệ trên 1 dòng
+          JSON_ARRAY=$(printf '%s\n' "${SERVICES[@]}" | jq -R . | jq -c -s .)
           echo "Detected services: $JSON_ARRAY"
 
+          # Ghi ra output (dạng chuẩn)
           echo "changed_services=$JSON_ARRAY" >> $GITHUB_OUTPUT
 
   # =======================
@@ -138,6 +148,7 @@ jobs:
     name: 🧩 Validate Docker Compose setup
     runs-on: ubuntu-latest
     needs: build-and-test
+
     steps:
       - name: 📦 Checkout source code
         uses: actions/checkout@v4
