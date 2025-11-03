@@ -8,7 +8,7 @@ on:
 
 jobs:
   # ======================================================
-  # 1️⃣ Xác định service nào có thay đổi
+  # 1️⃣ Detect service nào thay đổi
   # ======================================================
   detect-changes:
     runs-on: ubuntu-latest
@@ -30,24 +30,25 @@ jobs:
           for folder in services/*; do
             svc=$(basename "$folder")
             if echo "$CHANGED" | grep -q "$svc/"; then
-              SERVICES+=("$svc")
+              SERVICES+=("\"$svc\"")
             fi
           done
 
           if echo "$CHANGED" | grep -q "apps/frontend/"; then
-            SERVICES+=("frontend")
+            SERVICES+=("\"frontend\"")
           fi
 
           if [ ${#SERVICES[@]} -eq 0 ]; then
             echo "⚠️ No service changed, running all by default"
-            SERVICES=(api-gateway auth-service team-service frontend)
+            SERVICES=("\"api-gateway\"" "\"auth-service\"" "\"team-service\"" "\"frontend\"")
           fi
 
-          echo "Detected services: ${SERVICES[*]}"
-          echo "changed_services=${SERVICES[*]}" >> $GITHUB_OUTPUT
+          JSON_ARRAY="[${SERVICES[*]}]"
+          echo "Detected services: $JSON_ARRAY"
+          echo "changed_services=$JSON_ARRAY" >> $GITHUB_OUTPUT
 
   # ======================================================
-  # 2️⃣ Build + Test từng service độc lập
+  # 2️⃣ Build & Test từng service (matrix)
   # ======================================================
   build-and-test:
     name: Build & Test Matrix Services
@@ -56,7 +57,7 @@ jobs:
 
     strategy:
       matrix:
-        service: ${{ fromJSON(format('["{0}"]', join(needs.detect-changes.outputs.changed_services, '","'))) }}
+        service: ${{ fromJSON(needs.detect-changes.outputs.changed_services) }}
       max-parallel: 4
       fail-fast: false
 
@@ -94,7 +95,7 @@ jobs:
         run: docker build -t ${{ matrix.service }} ./services/${{ matrix.service }}
 
       # ===============================
-      # FRONTEND (React + Vite)
+      # FRONTEND (React)
       # ===============================
       - name: 🎨 Install & Build Frontend
         if: ${{ matrix.service == 'frontend' }}
@@ -115,5 +116,5 @@ jobs:
       - name: 📦 Checkout source code
         uses: actions/checkout@v4
 
-      - name: 🐳 Validate Docker Compose file
+      - name: 🐳 Docker Compose Config Check
         run: docker compose config
