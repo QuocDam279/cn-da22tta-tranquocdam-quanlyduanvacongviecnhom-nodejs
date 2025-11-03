@@ -5,13 +5,9 @@ import { services } from '../config/serviceMap.js';
  * Proxy trung gian cho các service:
  * - /api/auth  → AUTH_SERVICE_URL
  * - /api/teams → TEAM_SERVICE_URL
- *
- * Gateway forward đầy đủ headers, Authorization và body tới downstream service.
- * Đã fix lỗi: "Cannot POST /api/auth/api/auth/register"
- * do lặp prefix /api/auth.
  */
 
-// Hàm phụ để forward body nếu express.json() đã đọc trước
+// Hàm này giúp ghi lại body vào request gửi sang service thật, đảm bảo POST, PUT, PATCH vẫn có dữ liệu.
 const forwardBody = (proxyReq, req) => {
   if (!req.body || !Object.keys(req.body).length) return;
   const bodyData = JSON.stringify(req.body);
@@ -24,13 +20,13 @@ const forwardBody = (proxyReq, req) => {
 // AUTH PROXY
 // ----------------------------
 export const authProxy = createProxyMiddleware({
-  target: services.auth,            // ví dụ: http://auth-service:5001/api/auth
+  target: services.auth,            
   changeOrigin: true,
   selfHandleResponse: false,
   proxyTimeout: 10000,
   timeout: 10000,
   pathRewrite: {
-    '^/api/auth': ''                // ✅ Xóa prefix '/api/auth' khi forward
+    '^/api/auth': ''                
   },
   logLevel: 'warn',
   onProxyReq: (proxyReq, req, res) => {
@@ -51,13 +47,13 @@ export const authProxy = createProxyMiddleware({
 // TEAM PROXY
 // ----------------------------
 export const teamProxy = createProxyMiddleware({
-  target: services.team,            // ví dụ: http://team-service:5002/api/teams
+  target: services.team,            
   changeOrigin: true,
   selfHandleResponse: false,
   proxyTimeout: 10000,
   timeout: 10000,
   pathRewrite: {
-    '^/api/teams': ''               // ✅ Xóa prefix '/api/teams' khi forward
+    '^/api/teams': ''               
   },
   logLevel: 'warn',
   onProxyReq: (proxyReq, req, res) => {
