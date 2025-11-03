@@ -20,7 +20,7 @@ jobs:
         run: |
           echo "🔍 Detecting changed services..."
 
-          # Kiểm tra commit range (đề phòng push đầu tiên)
+          # Nếu là lần đầu (chưa có commit trước)
           if git rev-parse HEAD~1 >/dev/null 2>&1; then
             CHANGED=$(git diff --name-only HEAD~1 HEAD)
           else
@@ -46,12 +46,14 @@ jobs:
             SERVICES=("api-gateway" "auth-service" "team-service")
           fi
 
-          # Tạo JSON hợp lệ
-          JSON_ARRAY=$(printf '%s\n' "${SERVICES[@]}" | jq -R . | jq -s .)
-          echo "Detected services: $JSON_ARRAY"
+          # Tạo JSON hợp lệ 1 dòng
+          JSON_ARRAY=$(printf '%s\n' "${SERVICES[@]}" | jq -R . | jq -cs .)
+          CLEAN_JSON=$(echo "$JSON_ARRAY" | tr -d '\n' | tr -d '\r' | xargs)
 
-          # Ghi output cho matrix job
-          echo "changed_services=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          echo "Detected services: $CLEAN_JSON"
+
+          # Ghi output an toàn
+          echo "changed_services=$CLEAN_JSON" >> "$GITHUB_OUTPUT"
 
   build-and-test:
     name: ⚙️ Build & Test Microservices
@@ -72,8 +74,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
 
       - name: 🔧 Cài đặt dependencies
         working-directory: services/${{ matrix.service }}
