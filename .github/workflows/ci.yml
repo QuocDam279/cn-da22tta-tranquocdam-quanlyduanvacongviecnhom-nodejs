@@ -1,4 +1,4 @@
-name: CI cho Microservices (Backend + Frontend)
+name: 🧱 CI cho Microservices (Backend + Frontend)
 
 on:
   push:
@@ -8,28 +8,32 @@ on:
 
 jobs:
   detect-changes:
+    name: 🔍 Detect Changed Services
     runs-on: ubuntu-latest
     outputs:
-      changed_services: ${{ steps.filter.outputs.changed_services }}
+      changed_services: ${{ steps.detect.outputs.changed_services }}
     steps:
       - name: 📦 Checkout source code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # cần để git diff hoạt động đúng
 
-      - name: 🔍 Detect changed folders
-        id: filter
+      - name: 🔎 Detect changed folders
+        id: detect
+        shell: bash
         run: |
           echo "Detecting changed services..."
-          CHANGED=$(git diff --name-only ${{ github.base_ref }}..${{ github.head_ref }} || echo "")
+          CHANGED=$(git diff --name-only HEAD^ HEAD || echo "")
 
           echo "Changed files:"
           echo "$CHANGED"
 
           SERVICES=()
 
-          # Kiểm tra các thư mục service thay đổi
+          # Kiểm tra thư mục services/*
           for folder in services/*; do
             svc=$(basename "$folder")
-            if echo "$CHANGED" | grep -q "$svc/"; then
+            if echo "$CHANGED" | grep -q "services/$svc/"; then
               SERVICES+=("$svc")
             fi
           done
@@ -44,15 +48,15 @@ jobs:
             SERVICES=("api-gateway" "auth-service" "team-service" "frontend")
           fi
 
-          # Tạo JSON hợp lệ
+          # Tạo mảng JSON chuẩn
           JSON_ARRAY=$(printf '%s\n' "${SERVICES[@]}" | jq -R . | jq -s .)
           echo "Detected services: $JSON_ARRAY"
 
-          # Xuất output
-          echo "changed_services=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          # Xuất output gọn gàng, không lỗi format
+          echo "changed_services=$(echo "$JSON_ARRAY" | tr -d '\n' | tr -d '\r')" >> $GITHUB_OUTPUT
 
   build-and-test:
-    name: Build & Test Matrix Services
+    name: 🧪 Build & Test Matrix Services
     runs-on: ubuntu-latest
     needs: detect-changes
 
@@ -70,11 +74,18 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: 'npm'
 
+      # ---------- BACKEND ----------
       - name: 🔧 Install dependencies (backend)
         if: ${{ matrix.service != 'frontend' }}
         working-directory: services/${{ matrix.service }}
-        run: npm install
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
 
       - name: ✅ Run Lint & Build (backend)
         if: ${{ matrix.service != 'frontend' }}
@@ -92,11 +103,16 @@ jobs:
         if: ${{ matrix.service != 'frontend' }}
         run: docker build -t ${{ matrix.service }} ./services/${{ matrix.service }}
 
+      # ---------- FRONTEND ----------
       - name: 🎨 Install & Build Frontend
         if: ${{ matrix.service == 'frontend' }}
         working-directory: apps/frontend
         run: |
-          npm install
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
           npm run build
 
   compose-check:
