@@ -38,11 +38,16 @@ jobs:
             SERVICES+=("frontend")
           fi
 
+          if [ ${#SERVICES[@]} -eq 0 ]; then
+            echo "⚠️ No service changed, running all by default"
+            SERVICES=(api-gateway auth-service team-service frontend)
+          fi
+
           echo "Detected services: ${SERVICES[*]}"
           echo "changed_services=${SERVICES[*]}" >> $GITHUB_OUTPUT
 
   # ======================================================
-  # 2️⃣ Build + Test từng service
+  # 2️⃣ Build + Test từng service độc lập
   # ======================================================
   build-and-test:
     name: Build & Test Matrix Services
@@ -63,6 +68,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: false # ⬅️ tắt hoàn toàn npm cache (để ngăn npm ci tự chạy)
 
       # ===============================
       # BACKEND SERVICES
@@ -89,7 +95,7 @@ jobs:
         run: docker build -t ${{ matrix.service }} ./services/${{ matrix.service }}
 
       # ===============================
-      # FRONTEND
+      # FRONTEND (React + Vite)
       # ===============================
       - name: 🎨 Install & Build Frontend
         if: ${{ matrix.service == 'frontend' }}
@@ -99,7 +105,7 @@ jobs:
           npm run build
 
   # ======================================================
-  # 3️⃣ Xác minh docker-compose
+  # 3️⃣ Kiểm tra docker-compose.yml hợp lệ
   # ======================================================
   compose-check:
     name: 🧩 Validate Docker Compose setup
