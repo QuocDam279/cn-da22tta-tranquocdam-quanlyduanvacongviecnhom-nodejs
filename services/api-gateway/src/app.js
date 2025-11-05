@@ -8,7 +8,7 @@ import dotenv from 'dotenv';
 
 import { requestLogger } from './middleware/requestLogger.js';
 import { verifyToken } from './middleware/verifyToken.js';
-import { authProxy, teamProxy } from './proxy/proxy.js';
+import { authProxy, projectProxy, teamProxy } from './proxy/proxy.js';
 import { services } from './config/serviceMap.js';
 
 dotenv.config();
@@ -49,6 +49,8 @@ app.use('/api/auth', authProxy);
  * We'll verify token for all /api/teams routes before proxying.
  */
 app.use('/api/teams', verifyToken, teamProxy);
+
+app.use('/api/projects', verifyToken, projectProxy);
 
 /**
  * 3) Catch-all for unknown proxied endpoints (optionally forward)

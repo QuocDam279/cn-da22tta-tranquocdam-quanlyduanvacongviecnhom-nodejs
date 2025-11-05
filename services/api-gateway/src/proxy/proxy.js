@@ -70,3 +70,30 @@ export const teamProxy = createProxyMiddleware({
     }
   }
 });
+
+// ----------------------------
+// PROJECT PROXY
+// ----------------------------
+export const projectProxy = createProxyMiddleware({
+  target: services.project,            
+  changeOrigin: true,
+  selfHandleResponse: false,
+  proxyTimeout: 10000,
+  timeout: 10000,
+  pathRewrite: {
+    '^/api/projects': ''               
+  },
+  logLevel: 'warn',
+  onProxyReq: (proxyReq, req, res) => {
+    forwardBody(proxyReq, req);
+  },
+  onError: (err, req, res) => {
+    console.error('[PROJECT PROXY ERROR]', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({
+        message: 'Cannot reach project service',
+        error: err.message
+      });
+    }
+  }
+});
