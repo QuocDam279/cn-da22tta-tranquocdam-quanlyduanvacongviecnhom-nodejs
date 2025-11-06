@@ -125,3 +125,58 @@ export const taskProxy = createProxyMiddleware({
     }
   }
 });
+
+// ----------------------------
+// TASK COMMENT PROXY
+// ----------------------------
+export const taskCommentProxy = createProxyMiddleware({
+  target: services.task_comment,       // 💡 trỏ tới URL comment service trong serviceMap
+  changeOrigin: true,
+  selfHandleResponse: false,
+  proxyTimeout: 10000,
+  timeout: 10000,
+  pathRewrite: {
+    '^/api/task-comments': ''          // bỏ prefix /api/task-comments khi chuyển tiếp
+  },
+  logLevel: 'warn',
+  onProxyReq: (proxyReq, req, res) => {
+    forwardBody(proxyReq, req);
+  },
+  onError: (err, req, res) => {
+    console.error('[TASK COMMENT PROXY ERROR]', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({
+        message: 'Cannot reach task comment service',
+        error: err.message
+      });
+    }
+  }
+});
+
+
+// ----------------------------
+// TASK ATTACHMENT PROXY
+// ----------------------------
+export const taskAttachmentProxy = createProxyMiddleware({
+  target: services.task_attachment,    // 💡 trỏ tới URL attachment service trong serviceMap
+  changeOrigin: true,
+  selfHandleResponse: false,
+  proxyTimeout: 20000,                 // ⏱️ tăng timeout cho upload file
+  timeout: 20000,
+  pathRewrite: {
+    '^/api/task-attachments': ''       // bỏ prefix /api/task-attachments
+  },
+  logLevel: 'warn',
+  onProxyReq: (proxyReq, req, res) => {
+    forwardBody(proxyReq, req);
+  },
+  onError: (err, req, res) => {
+    console.error('[TASK ATTACHMENT PROXY ERROR]', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({
+        message: 'Cannot reach task attachment service',
+        error: err.message
+      });
+    }
+  }
+});

@@ -1,5 +1,5 @@
 {
-  "name": "team-service",
+  "name": "project-service",
   "version": "1.0.0",
   "description": "Microservice quản lý nhóm (Team Service) cho hệ thống quản lý dự án và công việc nhóm",
   "main": "src/server.js",

@@ -1,4 +1,4 @@
-//services/api-gateway/src/app.js
+// services/api-gateway/src/app.js
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -8,63 +8,89 @@ import dotenv from 'dotenv';
 
 import { requestLogger } from './middleware/requestLogger.js';
 import { verifyToken } from './middleware/verifyToken.js';
-import { authProxy, projectProxy, teamProxy, taskProxy } from './proxy/proxy.js';
+import {
+  authProxy,
+  projectProxy,
+  teamProxy,
+  taskProxy,
+  taskCommentProxy,
+  taskAttachmentProxy
+} from './proxy/proxy.js';
 import { services } from './config/serviceMap.js';
 
 dotenv.config();
 
 const app = express();
 
+// 🛡️ Middleware cơ bản
 app.use(helmet());
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 app.use(requestLogger);
 
-// rate limiter cơ bản
+// ⚙️ Rate limiter cơ bản
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 200
 });
 app.use(limiter);
 
-// Healthcheck
+// 💓 Healthcheck
 app.get('/health', (req, res) => res.json({ status: 'ok', time: new Date() }));
 
-// Info route (useful debugging)
+// 🧭 Debug route hiển thị danh sách service nội bộ
 app.get('/_services', (req, res) => res.json({ services }));
 
 /**
- * 1) Routes to AUTH service
- * - register / login / users/info đều chuyển tiếp
- * - auth endpoints không cần verify token ở gateway (auth-service tự handle)
+ * 1️⃣ AUTH SERVICE
+ * - Các route đăng ký / đăng nhập / user info
+ * - Không cần verifyToken tại gateway
  */
 app.use('/api/auth', authProxy);
 
 /**
- * 2) Routes to TEAM service
- * team-service expects Authorization header and its own verifyToken middleware will check it,
- * but to fail fast we also verify token here for protected routes.
- *
- * We'll verify token for all /api/teams routes before proxying.
+ * 2️⃣ TEAM SERVICE
+ * - Bảo vệ bằng verifyToken trước khi proxy
  */
 app.use('/api/teams', verifyToken, teamProxy);
 
+/**
+ * 3️⃣ PROJECT SERVICE
+ */
 app.use('/api/projects', verifyToken, projectProxy);
 
+/**
+ * 4️⃣ TASK SERVICE (chính)
+ */
 app.use('/api/tasks', verifyToken, taskProxy);
 
 /**
- * 3) Catch-all for unknown proxied endpoints (optionally forward)
+ * 5️⃣ TASK COMMENT SERVICE
+ * - Cho phép tạo/lấy/xóa bình luận task
+ */
+app.use('/api/task-comments', verifyToken, taskCommentProxy);
+
+/**
+ * 6️⃣ TASK ATTACHMENT SERVICE
+ * - Cho phép upload/lấy/xóa file đính kèm
+ */
+app.use('/api/task-attachments', verifyToken, taskAttachmentProxy);
+
+/**
+ * 7️⃣ Catch-all cho service chưa định nghĩa
  */
 app.use('/api/:service', (req, res) => {
   res.status(404).json({ message: 'Service not configured in API Gateway' });
 });
 
-// Error handler
+// 🧯 Global Error Handler
 app.use((err, req, res, next) => {
   console.error('[GATEWAY ERROR]', err);
-  res.status(500).json({ message: 'Gateway internal error', error: err.message });
+  res.status(500).json({
+    message: 'Gateway internal error',
+    error: err.message
+  });
 });
 
 export default app;
