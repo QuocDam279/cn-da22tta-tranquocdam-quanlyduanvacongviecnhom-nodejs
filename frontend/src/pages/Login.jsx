@@ -35,7 +35,7 @@ export default function Login() {
       localStorage.setItem("user", JSON.stringify(data.user));
 
       setMessage({ type: "success", text: "Đăng nhập thành công!" });
-      setTimeout(() => navigate("/dashboard"), 2000);
+      setTimeout(() => navigate("/tongquan"), 2000);
 
     } catch (err) {
       setMessage({ type: "error", text: err.message });

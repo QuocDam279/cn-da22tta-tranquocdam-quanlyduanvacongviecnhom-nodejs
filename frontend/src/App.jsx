@@ -4,6 +4,8 @@ import { Routes, Route, Navigate } from "react-router-dom";
 // Pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import Team from "./pages/Team";
 
 // Component bảo vệ route cần đăng nhập
 function RequireAuth({ children }) {
@@ -21,6 +23,24 @@ function App() {
       {/* Auth routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      {/* Protected routes */}
+      <Route
+        path="/tongquan"
+        element={
+          <RequireAuth>
+            <Dashboard />
+          </RequireAuth>
+        }
+      /> 
+      
+      <Route
+        path="/nhom"
+        element={
+          <RequireAuth>
+            <Team />
+          </RequireAuth>
+        }
+      />
       
     </Routes>
   );
