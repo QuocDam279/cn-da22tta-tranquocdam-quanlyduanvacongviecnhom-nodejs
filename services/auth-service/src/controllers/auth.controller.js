@@ -59,3 +59,28 @@ export const getUsersInfo = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
 };
+
+// 📌 Tìm user theo email (dùng cho các microservice)
+export const findUserByEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ message: "Email là bắt buộc" });
+    }
+
+    const user = await User.findOne(
+      { email },
+      "_id full_name email avatar created_at"
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy user" });
+    }
+
+    res.json({ user });
+  } catch (error) {
+    console.error("❌ Lỗi findUserByEmail:", error.message);
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};
