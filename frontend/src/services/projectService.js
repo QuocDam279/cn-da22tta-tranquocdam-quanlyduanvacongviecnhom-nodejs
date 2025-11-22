@@ -49,12 +49,19 @@ export function getProjectById(projectId) {
   return apiRequest(`${API_URL}/${projectId}`, { method: "GET" });
 }
 
-// Cập nhật project
+// Cập nhật project đầy đủ (PUT)
 export function updateProject(projectId, payload) {
-  // payload có thể chứa: { project_name, description, start_date, end_date, status, progress }
   return apiRequest(`${API_URL}/${projectId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+// ❗🆕 Cập nhật trạng thái riêng
+export function updateProjectStatus(projectId, status) {
+  return apiRequest(`${API_URL}/${projectId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
 

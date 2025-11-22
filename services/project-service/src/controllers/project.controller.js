@@ -200,3 +200,46 @@ export const getMyProjects = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
 };
+
+/**
+ * 🔄 Cập nhật trạng thái dự án (chỉ đổi status)
+ */
+export const updateProjectStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+
+    const project = await Project.findById(id);
+    if (!project) return res.status(404).json({ message: 'Không tìm thấy dự án' });
+
+    // ❗ Chỉ người tạo mới có quyền đổi status (tuỳ bạn muốn nới lỏng hay không)
+    if (project.created_by.toString() !== req.user.id)
+      return res.status(403).json({ message: 'Bạn không có quyền đổi trạng thái dự án này' });
+
+    const oldStatus = project.status;
+    project.status = status;
+    project.updated_at = new Date();
+    await project.save();
+
+    // 🧾 Ghi activity log
+    try {
+      await http.activity.post(
+        '/',
+        {
+          user_id: req.user.id,
+          action: `Thay đổi trạng thái dự án: ${project.project_name} (${oldStatus} → ${status})`,
+          related_id: project._id,
+          related_type: 'project'
+        },
+        { headers: { Authorization: req.headers.authorization } }
+      );
+    } catch (logErr) {
+      console.warn('⚠ Không thể ghi activity log (updateProjectStatus):', logErr.message);
+    }
+
+    res.json({ message: 'Cập nhật trạng thái thành công', project });
+  } catch (error) {
+    console.error('❌ Lỗi updateProjectStatus:', error.message);
+    res.status(500).json({ message: 'Lỗi server', error: error.message });
+  }
+};

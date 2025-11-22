@@ -8,8 +8,24 @@ import http from '../utils/httpClient.js';
  */
 export const createTask = async (req, res) => {
   try {
-    const { project_id, task_name, description, assigned_to, start_date, due_date, priority } = req.body;
+    const {
+      project_id,
+      task_name,
+      description,
+      assigned_to,
+      start_date,
+      due_date,
+      priority,
+      status = "To Do",
+      progress = 0
+    } = req.body;
+
     const created_by = req.user.id;
+
+    // Kiểm tra ngày hợp lệ
+    if (start_date && due_date && new Date(start_date) > new Date(due_date)) {
+      return res.status(400).json({ message: 'Ngày kết thúc phải sau ngày bắt đầu' });
+    }
 
     // 1️⃣ Lấy project để biết team_id
     const { data: project } = await http.project.get(`/${project_id}`, {
@@ -28,19 +44,21 @@ export const createTask = async (req, res) => {
     if (!memberIds.includes(assigned_to))
       return res.status(403).json({ message: 'Người được giao không thuộc team của dự án này' });
 
-    // 4️⃣ Nếu hợp lệ → tạo task
+    // 4️⃣ Tạo task
     const task = await Task.create({
       project_id,
       task_name,
       description,
       assigned_to,
       created_by,
-      start_date,
-      due_date,
-      priority
+      start_date: start_date || null,
+      due_date: due_date || null,
+      priority,
+      status,
+      progress
     });
 
-    // 🧾 5️⃣ Ghi log hoạt động (gọi sang Activity Service)
+    // 🧾 Ghi log hoạt động
     try {
       await http.activity.post(
         '/',

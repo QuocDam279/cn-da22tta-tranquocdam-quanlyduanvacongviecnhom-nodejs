@@ -7,7 +7,8 @@ import {
   getProjectById,
   updateProject,
   deleteProject,
-  getMyProjects
+  getMyProjects,
+  updateProjectStatus
 } from '../controllers/project.controller.js';
 
 const router = express.Router();
@@ -29,5 +30,8 @@ router.put('/:id', verifyToken, updateProject);
 
 // 🗑️ Xóa dự án
 router.delete('/:id', verifyToken, deleteProject);
+
+// 🔄 Cập nhật trạng thái dự án
+router.patch('/:id/status', verifyToken, updateProjectStatus);
 
 export default router;

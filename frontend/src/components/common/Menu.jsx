@@ -5,9 +5,9 @@ import { LayoutDashboard, Users, FolderKanban, ListChecks, History, Menu as Menu
 export default function Menu({ collapsed, setCollapsed }) {
   const menuItems = [
     { name: "Tổng quan", icon: <LayoutDashboard size={18} />, path: "/tongquan" },
-    { name: "Nhóm", icon: <Users size={18} />, path: "/nhom" },
-    { name: "Dự án", icon: <FolderKanban size={18} />, path: "/tasks" },
-    { name: "Công việc", icon: <ListChecks size={18} />, path: "/activity" },
+    { name: "Nhóm dự án", icon: <Users size={18} />, path: "/nhom" },
+    { name: "Dự án", icon: <FolderKanban size={18} />, path: "/duan" },
+    { name: "Công việc", icon: <ListChecks size={18} />, path: "/congviec" },
     { name: "Nhật ký hoạt động", icon: <History size={18} />, path: "/assistant" },
   ];
 
