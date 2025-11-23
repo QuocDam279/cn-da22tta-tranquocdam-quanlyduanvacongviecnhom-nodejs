@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Calendar, Info, Clock, PauseCircle, CheckCircle, ChevronDown } from "lucide-react";
 import ProjectActions from "./ProjectActions";
-import { updateProjectStatus } from "../../services/projectService";
+import { getProjectById, updateProjectStatus } from "../../services/projectService";
 import SuccessDialog from "../common/SuccessDialog";
 
 function formatDate(dateStr) {
@@ -10,14 +10,14 @@ function formatDate(dateStr) {
   return d.toLocaleDateString("vi-VN");
 }
 
-export default function ProjectInfo({ project: initialProject }) {
+export default function ProjectInfo({ project: initialProject, taskUpdatedFlag }) {
   const userId = localStorage.getItem("userId");
   const isCreator = initialProject.created_by?._id === userId;
 
-  const [project, setProject] = useState(initialProject); // dùng state để quản lý project
+  const [project, setProject] = useState(initialProject);
   const [statusOpen, setStatusOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false); // state cho SuccessDialog
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMessage, setDialogMessage] = useState("");
 
   const statusMap = {
@@ -29,6 +29,19 @@ export default function ProjectInfo({ project: initialProject }) {
   const statusOptions = Object.keys(statusMap);
   const statusInfo = statusMap[project.status] || statusMap.Planned;
 
+  // ⚡ Khi taskUpdatedFlag thay đổi, fetch lại project
+  useEffect(() => {
+    const fetchProject = async () => {
+      try {
+        const updated = await getProjectById(initialProject._id);
+        setProject(updated);
+      } catch (err) {
+        console.error("❌ Lỗi fetch project:", err.message);
+      }
+    };
+    fetchProject();
+  }, [taskUpdatedFlag]);
+
   const handleChangeStatus = async (newStatus) => {
     if (newStatus === project.status) {
       setStatusOpen(false);
@@ -37,11 +50,7 @@ export default function ProjectInfo({ project: initialProject }) {
     try {
       setLoading(true);
       await updateProjectStatus(project._id, newStatus);
-
-      // ✅ cập nhật state ngay lập tức
       setProject({ ...project, status: newStatus });
-
-      // ✅ hiển thị dialog
       setDialogMessage("Cập nhật trạng thái thành công!");
       setDialogOpen(true);
     } catch (err) {
@@ -66,7 +75,6 @@ export default function ProjectInfo({ project: initialProject }) {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Time */}
           <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-md shadow-sm">
             <Calendar className="text-blue-500" size={20} />
             <div>
@@ -77,7 +85,6 @@ export default function ProjectInfo({ project: initialProject }) {
             </div>
           </div>
 
-          {/* Status */}
           <div className="relative p-3 bg-gray-50 rounded-md shadow-sm">
             <div
               className="flex items-center justify-between cursor-pointer"
@@ -113,7 +120,6 @@ export default function ProjectInfo({ project: initialProject }) {
             )}
           </div>
 
-          {/* Progress */}
           {project.status === "In Progress" && (
             <div className="flex flex-col gap-2 p-3 bg-gray-50 rounded-md shadow-sm">
               <div className="flex items-center gap-2">
@@ -132,7 +138,6 @@ export default function ProjectInfo({ project: initialProject }) {
         </div>
       </div>
 
-      {/* SuccessDialog */}
       <SuccessDialog open={dialogOpen} onClose={() => setDialogOpen(false)} message={dialogMessage} />
     </>
   );

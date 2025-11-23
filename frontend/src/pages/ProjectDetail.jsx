@@ -21,6 +21,7 @@ export default function ProjectDetail() {
   // Task states
   const [tasks, setTasks] = useState([]);
   const [taskLoading, setTaskLoading] = useState(false);
+  const [taskUpdatedFlag, setTaskUpdatedFlag] = useState(0); // ⚡ flag để ProjectInfo biết
 
   const sidebarWidth = collapsed ? "4rem" : "16rem";
 
@@ -51,6 +52,12 @@ export default function ProjectDetail() {
     }
   };
 
+  // ---------- Callback khi task được tạo / sửa / xóa ----------
+  const handleTaskUpdated = () => {
+    setTaskUpdatedFlag(f => f + 1); // ⚡ tăng flag
+    fetchTasks();
+  };
+
   useEffect(() => {
     fetchProject();
   }, [id]);
@@ -72,7 +79,7 @@ export default function ProjectDetail() {
           className="pt-24 px-6 space-y-8 transition-all duration-300"
           style={{ marginLeft: sidebarWidth }}
         >
-          <ProjectInfo project={project} />
+          <ProjectInfo project={project} taskUpdatedFlag={taskUpdatedFlag} />
 
           <TabsContainer
             tabs={[
@@ -98,8 +105,8 @@ export default function ProjectDetail() {
 
                 <CreateTaskButton
                   projectId={id}
-                  onCreated={fetchTasks}
-                  members={project.team_members || []} // ✅ Truyền member có user info
+                  onCreated={handleTaskUpdated} // ⚡ dùng callback mới
+                  members={project.team_members || []}
                 />
               </div>
             )}

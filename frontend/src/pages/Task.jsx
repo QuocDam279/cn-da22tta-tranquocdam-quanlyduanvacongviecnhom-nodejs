@@ -15,7 +15,6 @@ export default function Task() {
 
   const sidebarWidth = collapsed ? "4rem" : "16rem";
 
-  // ---------- Fetch task của user ----------
   const fetchTasks = async () => {
     setLoading(true);
     setError("");
@@ -23,22 +22,17 @@ export default function Task() {
       const data = await getMyTasks();
       setTasks(data);
     } catch (err) {
-      console.error(err);
-      setError(err.message || "Lỗi khi tải công việc");
+      setError("Lỗi khi tải công việc");
     } finally {
       setLoading(false);
     }
   };
 
-  // ---------- Fetch thống kê task ----------
   const fetchStats = async () => {
     try {
-      // Bỏ projectId, fetch tổng hợp tất cả task của user
       const data = await getTaskStats();
       setStats(data);
-    } catch (err) {
-      console.error(err);
-    }
+    } catch {}
   };
 
   useEffect(() => {
@@ -47,7 +41,7 @@ export default function Task() {
   }, []);
 
   return (
-    <div className="bg-white min-h-screen flex">
+    <div className="bg-gray-50 min-h-screen flex">
       <Menu collapsed={collapsed} setCollapsed={setCollapsed} />
 
       <div className="flex-1">
@@ -57,20 +51,16 @@ export default function Task() {
           className="pt-24 px-6 space-y-8 transition-all duration-300"
           style={{ marginLeft: sidebarWidth }}
         >
-          <h1 className="text-2xl font-bold mb-4">Công việc của tôi</h1>
+          <h1 className="text-3xl font-bold mb-2">Công việc của tôi</h1>
 
-          {/* Thống kê task */}
           <TaskStats stats={stats} />
 
-          {/* Danh sách task */}
           {loading ? (
             <p>Đang tải công việc...</p>
           ) : error ? (
             <p className="text-red-500">{error}</p>
-          ) : tasks.length > 0 ? (
-            <TaskList tasks={tasks} />
           ) : (
-            <p>Chưa có công việc nào.</p>
+            <TaskList tasks={tasks} />
           )}
         </div>
       </div>
