@@ -144,7 +144,7 @@ export const updateTask = async (req, res) => {
     if (!task)
       return res.status(404).json({ message: 'Không tìm thấy công việc' });
 
-    // ✅ Chỉ người tạo hoặc người được giao mới được sửa
+    // Chỉ người tạo hoặc người được giao mới được sửa
     if (
       task.created_by.toString() !== req.user.id &&
       task.assigned_to?.toString() !== req.user.id
@@ -154,9 +154,8 @@ export const updateTask = async (req, res) => {
         .json({ message: 'Bạn không có quyền sửa công việc này' });
     }
 
-    // ✅ Nếu có assigned_to mới, kiểm tra xem có thuộc team của project không
+    // Kiểm tra assigned_to mới
     if (assigned_to && assigned_to !== task.assigned_to?.toString()) {
-      // Gọi Project Service để lấy project (biết team_id)
       const { data: project } = await http.project.get(`/${task.project_id}`, {
         headers: { Authorization: req.headers.authorization }
       });
@@ -167,17 +166,12 @@ export const updateTask = async (req, res) => {
           .json({ message: 'Không thể xác định team của dự án này' });
       }
 
-      // Gọi Team Service để lấy danh sách thành viên
       const { data: teamData } = await http.team.get(
         `/${project.team._id}`,
         { headers: { Authorization: req.headers.authorization } }
       );
 
-      // Danh sách ID thành viên
-      const memberIds = teamData.members.map(m =>
-        m.user?._id?.toString()
-      );
-
+      const memberIds = teamData.members.map(m => m.user?._id?.toString());
       if (!memberIds.includes(assigned_to)) {
         return res.status(403).json({
           message: 'Người được giao không thuộc team của dự án này'
@@ -194,12 +188,14 @@ export const updateTask = async (req, res) => {
     if (due_date) task.due_date = due_date;
     if (status) task.status = status;
     if (priority) task.priority = priority;
+
+    const oldProgress = task.progress;
     if (progress !== undefined) task.progress = progress;
 
     task.updated_at = new Date();
     await task.save();
 
-    // 🧾 1️⃣ Ghi log hoạt động (gọi sang Activity Service)
+    // 🧾 Ghi log hoạt động
     try {
       await http.activity.post(
         '/',
@@ -213,6 +209,19 @@ export const updateTask = async (req, res) => {
       );
     } catch (logError) {
       console.warn('⚠ Không thể ghi activity log:', logError.message);
+    }
+
+    // 🔄 Nếu progress thay đổi → gọi Project Service cập nhật progress
+    if (progress !== undefined && progress !== oldProgress) {
+      try {
+        await http.project.post(
+          `/${task.project_id}/recalc-progress`,
+          { progress: undefined }, // Project Service sẽ tự tính trung bình Task, nên body có thể rỗng
+          { headers: { Authorization: req.headers.authorization } }
+        );
+      } catch (err) {
+        console.warn('⚠ Không thể cập nhật tiến độ project:', err.message);
+      }
     }
 
     res.json({ message: 'Cập nhật công việc thành công', task });
@@ -233,11 +242,11 @@ export const deleteTask = async (req, res) => {
     const task = await Task.findById(id);
     if (!task) return res.status(404).json({ message: 'Không tìm thấy công việc' });
 
-    // ✅ Chỉ người tạo mới được xóa
+    // Chỉ người tạo mới được xóa
     if (task.created_by.toString() !== req.user.id)
       return res.status(403).json({ message: 'Bạn không có quyền xóa công việc này' });
 
-    // 🧾 1️⃣ Ghi log hoạt động trước khi xóa (để tránh mất tên task)
+    // Ghi log hoạt động trước khi xóa
     try {
       await http.activity.post(
         '/',
@@ -253,8 +262,21 @@ export const deleteTask = async (req, res) => {
       console.warn('⚠ Không thể ghi activity log khi xóa task:', logError.message);
     }
 
-    // 🧹 2️⃣ Thực hiện xóa công việc
+    const projectId = task.project_id;
+
+    // Xóa task
     await task.deleteOne();
+
+    // 🔄 Gọi Project Service để tính lại progress sau khi xóa task
+    try {
+      await http.project.post(
+        `/${projectId}/recalc-progress`,
+        { progress: undefined },
+        { headers: { Authorization: req.headers.authorization } }
+      );
+    } catch (err) {
+      console.warn('⚠ Không thể cập nhật tiến độ project sau khi xóa task:', err.message);
+    }
 
     res.json({ message: 'Xóa công việc thành công' });
   } catch (error) {

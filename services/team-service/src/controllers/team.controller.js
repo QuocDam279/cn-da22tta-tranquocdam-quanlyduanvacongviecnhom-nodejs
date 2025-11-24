@@ -285,3 +285,39 @@ export const leaveTeam = async (req, res) => {
     res.status(500).json({ message: "Lỗi server", error: error.message });
   }
 };
+
+/**
+ * 👑 Lấy danh sách team mà user là leader
+ */
+export const getLeaderTeams = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // 1️⃣ Tìm các team mà user là leader
+    const leaderRecords = await TeamMember.find({
+      user_id: userId,
+      role: 'leader'
+    });
+
+    const leaderTeamIds = leaderRecords.map(r => r.team_id);
+
+    // 2️⃣ Lấy thông tin team
+    const teams = await Team.find({ _id: { $in: leaderTeamIds } });
+
+    // 3️⃣ Đếm số thành viên
+    const teamsWithMemberCount = await Promise.all(
+      teams.map(async (team) => {
+        const count = await TeamMember.countDocuments({ team_id: team._id });
+        return {
+          ...team.toObject(),
+          memberCount: count
+        };
+      })
+    );
+
+    res.json(teamsWithMemberCount);
+  } catch (error) {
+    console.error("❌ Lỗi getLeaderTeams:", error.message);
+    res.status(500).json({ message: "Lỗi server", error: error.message });
+  }
+};

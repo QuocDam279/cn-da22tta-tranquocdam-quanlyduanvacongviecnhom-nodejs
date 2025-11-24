@@ -88,3 +88,8 @@ export function leaveTeam(teamId) {
     method: "POST",
   });
 }
+
+// Lấy các team do user hiện tại tạo
+export function getLeaderTeams() {
+  return apiRequest(`${API_URL}/leader`, { method: "GET" });
+}

@@ -8,7 +8,8 @@ import {
   updateProject,
   deleteProject,
   getMyProjects,
-  updateProjectStatus
+  updateProjectStatus,
+  recalcProjectProgress
 } from '../controllers/project.controller.js';
 
 const router = express.Router();
@@ -33,5 +34,8 @@ router.delete('/:id', verifyToken, deleteProject);
 
 // 🔄 Cập nhật trạng thái dự án
 router.patch('/:id/status', verifyToken, updateProjectStatus);
+// 🔄 Tính lại tiến độ dự án
+router.post('/:id/recalc-progress', verifyToken, recalcProjectProgress);
+
 
 export default router;

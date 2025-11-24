@@ -9,18 +9,43 @@ function getToken() {
 
 // Hàm chuẩn gọi API kèm token
 async function apiRequest(url, options = {}) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-      ...(options.headers || {}),
-    },
-  });
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${getToken()}`,
+        ...(options.headers || {}),
+      },
+    });
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.message || "Lỗi API Task Service");
-  return data;
+    // ✅ Xử lý trường hợp token hết hạn
+    if (res.status === 401) {
+      localStorage.removeItem("token");
+      window.location.href = "/login"; // Hoặc dùng router.push('/login')
+      throw new Error("Phiên đăng nhập hết hạn");
+    }
+
+    // ✅ Kiểm tra xem response có phải JSON không
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      throw new Error(`Lỗi server: ${res.status} ${res.statusText}`);
+    }
+
+    const data = await res.json();
+    
+    if (!res.ok) {
+      throw new Error(data.message || `Lỗi API: ${res.status}`);
+    }
+    
+    return data;
+  } catch (error) {
+    // ✅ Xử lý lỗi network
+    if (error.name === "TypeError" && error.message === "Failed to fetch") {
+      throw new Error("Không thể kết nối đến server");
+    }
+    throw error;
+  }
 }
 
 // =====================================================
@@ -64,8 +89,8 @@ export function deleteTask(taskId) {
   });
 }
 
-// 📊 Lấy thống kê task theo project
-export function getTaskStats(projectId) {
+// 📊 Lấy thống kê task theo project hoặc của user
+export function getTaskStats(projectId = null) {
   const url = projectId ? `${API_URL}/stats/${projectId}` : `${API_URL}/stats`;
   return apiRequest(url, { method: "GET" });
 }
@@ -73,13 +98,6 @@ export function getTaskStats(projectId) {
 // 👤 Lấy tất cả task của user hiện tại
 export function getMyTasks() {
   return apiRequest(`${API_URL}/my`, {
-    method: "GET",
-  });
-}
-
-// 🧠 Lấy toàn bộ task (route nội bộ)
-export function getAllTasksInternal() {
-  return apiRequest(`${API_URL}/internal/all`, {
     method: "GET",
   });
 }

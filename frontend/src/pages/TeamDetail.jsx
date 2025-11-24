@@ -1,5 +1,6 @@
 // src/components/team/TeamDetail.jsx
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useParams, useNavigate } from "react-router-dom";
 import Menu from "../components/common/Menu";
 import Header from "../components/common/Header";
@@ -83,7 +84,7 @@ export default function TeamDetail() {
       <div className="flex-1">
         <Header collapsed={collapsed} sidebarWidth={sidebarWidth} />
         <div
-          className="pt-24 px-6 space-y-8 transition-all duration-300"
+          className="pt-20 px-6 space-y-8 transition-all duration-300 mb-6"
           style={{ marginLeft: sidebarWidth }}
         >
           {loading ? (
@@ -92,6 +93,18 @@ export default function TeamDetail() {
             <p className="text-red-500">{error}</p>
           ) : team ? (
             <>
+              {/* Breadcrumb */}
+              <div className="text-sm text-gray-500 mb-4 flex items-center gap-1">
+                <Link
+                  to="/nhom"
+                  className="hover:text-blue-600 transition-colors font-medium"
+                >
+                  Nhóm
+                </Link>
+                <span className="mx-1 text-gray-400">→</span>
+                <span className="font-medium text-gray-700">{team.team.team_name}</span>
+              </div>
+
               <TeamInfo team={team.team} members={team.members} />
 
               <TeamActions

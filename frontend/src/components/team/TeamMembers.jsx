@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, X, User } from "lucide-react";
+import React, { useState, useMemo } from "react";
+import { Plus, X, User, Search } from "lucide-react";
 import { addMembers, removeMember, leaveTeam } from "../../services/teamService";
 import { findUserByEmail } from "../../services/authService";
 import { useNavigate } from "react-router-dom";
@@ -11,13 +11,19 @@ export default function TeamMembers({
   currentUserRole,
   onMembersUpdated
 }) {
-    // Debug
-  console.log('TeamMembers - currentUserRole:', currentUserRole);
-  console.log('TeamMembers - currentUserId:', currentUserId);
   const [emailInput, setEmailInput] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+
+  const removeVietnameseTone = (str) =>
+    str
+      ?.normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "D")
+      .toLowerCase();
 
   const handleAddMember = async () => {
     if (!emailInput.trim()) return;
@@ -69,9 +75,7 @@ export default function TeamMembers({
     try {
       await leaveTeam(teamId);
       onMembersUpdated(members.filter((m) => m.user?._id !== currentUserId));
-
-      // Sau khi rời nhóm, chuyển hướng ra ngoài
-      navigate("/nhom"); 
+      navigate("/nhom");
     } catch (err) {
       setError(err.message || "Rời nhóm thất bại");
     } finally {
@@ -79,59 +83,99 @@ export default function TeamMembers({
     }
   };
 
+  const filteredMembers = useMemo(() => {
+    if (!searchValue.trim()) return members;
+    const query = removeVietnameseTone(searchValue.trim());
+    return members.filter((m) => {
+      const name = removeVietnameseTone(m.user?.full_name || "");
+      const email = removeVietnameseTone(m.user?.email || "");
+      return name.includes(query) || email.includes(query);
+    });
+  }, [members, searchValue]);
+
   return (
-    <div>
-      {/* Input thêm thành viên - luôn hiển thị */}
-      <div className="flex items-center gap-2 mb-4 border px-3 py-2 rounded-lg">
-        <User size={18} className="text-gray-600" />
-        <input
-          type="text"
-          value={emailInput}
-          onChange={(e) => setEmailInput(e.target.value)}
-          placeholder="Nhập email thành viên"
-          className="flex-1 outline-none"
-        />
-        <button
-          onClick={handleAddMember}
-          disabled={loading}
-          className="p-2 bg-gray-200 rounded hover:bg-gray-300"
-        >
-          <Plus size={16} />
-        </button>
+    <div className="space-y-6">
+
+      <div className="flex gap-4">
+        {/* Thêm thành viên */}
+        <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-md border border-gray-200 w-1/2">
+          <User size={22} className="text-gray-400" />
+          <input
+            type="text"
+            value={emailInput}
+            onChange={(e) => setEmailInput(e.target.value)}
+            placeholder="Nhập email để thêm thành viên"
+            className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+          <button
+            onClick={handleAddMember}
+            disabled={loading}
+            className="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Plus size={16} /> Thêm
+          </button>
+        </div>
+
+        {/* Tìm kiếm thành viên */}
+        <div className="flex items-center gap-2 w-1/2">
+          <input
+            type="text"
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            placeholder="Tìm kiếm thành viên"
+            className="flex-1 px-3 py-2 rounded-l-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300"
+          />
+          <button
+            disabled
+            className="px-3 py-2 bg-gray-100 border border-l-0 rounded-r-lg text-gray-500 cursor-not-allowed"
+          >
+            <Search size={16} />
+          </button>
+        </div>
       </div>
 
-      {error && <p className="text-red-500 mb-2 text-sm">{error}</p>}
+      {error && <p className="text-red-500 text-sm">{error}</p>}
 
       {/* Danh sách thành viên */}
-      <div className="space-y-2">
-        {members.map((m) => (
-          <div key={m._id} className="flex justify-between items-center border px-3 py-2 rounded">
+      <div className="bg-white rounded-xl shadow-md border border-gray-200 divide-y divide-gray-100">
+        {filteredMembers.map((m) => (
+          <div
+            key={m._id}
+            className="flex justify-between items-center p-3 hover:bg-gray-50 transition-colors"
+          >
             <div>
-              <p className="font-medium">{m.user?.full_name}</p>
-              <p className="text-sm text-gray-600">{m.user?.email}</p>
+              <p className="font-semibold">{m.user?.full_name}</p>
+              <p className="text-sm text-gray-500">{m.user?.email}</p>
             </div>
 
-            {/* Quyền hiển thị nút */}
             {m.user?._id === currentUserId ? (
-              // Nút rời nhóm - chỉ hiển thị nếu không phải leader
               currentUserRole !== "leader" && (
-              <button
-                onClick={handleLeaveTeam}
-                className="px-3 py-1.5 bg-red-100 text-red-700 rounded-md hover:bg-red-200 transition-all duration-200 text-sm font-medium"
-              >
-                Rời nhóm
-              </button>
+                <button
+                  onClick={handleLeaveTeam}
+                  className="px-3 py-1.5 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors font-medium text-sm"
+                >
+                  Rời nhóm
+                </button>
               )
             ) : (
-              // Nút xóa thành viên cho leader
               currentUserRole === "leader" && (
-                <button onClick={() => handleRemoveMember(m.user._id)}>
+                <button
+                  onClick={() => handleRemoveMember(m.user._id)}
+                  className="p-2 hover:bg-red-50 rounded-full transition-colors"
+                  title="Xóa thành viên"
+                >
                   <X size={18} className="text-red-500" />
                 </button>
               )
             )}
           </div>
         ))}
+
+        {filteredMembers.length === 0 && (
+          <p className="p-4 text-center text-gray-400 text-sm">
+            Không tìm thấy thành viên nào
+          </p>
+        )}
       </div>
     </div>
   );

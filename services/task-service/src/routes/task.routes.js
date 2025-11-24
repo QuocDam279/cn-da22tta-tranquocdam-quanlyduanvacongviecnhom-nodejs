@@ -22,16 +22,10 @@ const router = express.Router();
 router.post('/', verifyToken, createTask);
 
 /**
- * 📋 Lấy tất cả task theo project
- * GET /api/tasks/project/:projectId
+ * 👤 Lấy tất cả task của user hiện tại
+ * GET /api/tasks/my
  */
-router.get('/project/:projectId', verifyToken, getTasksByProject);
-
-/**
- * 📊 Thống kê task theo project
- * GET /api/tasks/stats/:projectId
- */
-router.get('/stats/:projectId', verifyToken, getTaskStatsByProject);
+router.get('/my', verifyToken, getMyTasks);
 
 /**
  * 📊 Thống kê task của user (tất cả project)
@@ -58,21 +52,27 @@ router.get('/stats', verifyToken, async (req, res) => {
 });
 
 /**
- * 👤 Lấy tất cả task của user hiện tại
- * GET /api/tasks/my
- */
-router.get('/my', verifyToken, getMyTasks);
-
-/**
  * 🧠 Route nội bộ cho Notification Service
  * GET /api/tasks/internal/all
  */
 router.get('/internal/all', getAllTasks);
 
 /**
+ * 📋 Lấy tất cả task theo project (dùng cho internal service call)
+ * GET /api/tasks/project/:projectId
+ */
+router.get('/project/:projectId', verifyToken, getTasksByProject);
+
+/**
+ * 📊 Thống kê task theo project
+ * GET /api/tasks/stats/:projectId
+ */
+router.get('/stats/:projectId', verifyToken, getTaskStatsByProject);
+
+/**
  * 🔍 Lấy chi tiết 1 task
  * GET /api/tasks/:id
- * ✅ Đặt cuối cùng để không bị nhầm với các route cố định
+ * ⚠️ QUAN TRỌNG: Đặt cuối cùng để không bị nhầm với các route cố định như /my, /stats, /project/:id
  */
 router.get('/:id', verifyToken, getTaskById);
 

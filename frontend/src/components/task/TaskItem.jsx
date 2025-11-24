@@ -1,8 +1,7 @@
-// components/task/TaskItem.jsx
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function TaskItem({ task }) {
+export default function TaskItem({ task, onTaskUpdated }) {
   const navigate = useNavigate();
 
   const handleClick = () => navigate(`/congviec/${task._id}`);
@@ -18,6 +17,11 @@ export default function TaskItem({ task }) {
     Low: "bg-green-100 text-green-700",
     Medium: "bg-yellow-100 text-yellow-700",
     High: "bg-red-100 text-red-700",
+  };
+
+  // Khi task update xong hoặc delete → gọi callback
+  const handleUpdateProjectProgress = () => {
+    if (onTaskUpdated) onTaskUpdated();
   };
 
   return (

@@ -69,3 +69,10 @@ export function updateProjectStatus(projectId, status) {
 export function deleteProject(projectId) {
   return apiRequest(`${API_URL}/${projectId}`, { method: "DELETE" });
 }
+
+// ❗🆕 Tính lại tiến độ dự á n
+export function recalcProjectProgress(projectId) {
+  return apiRequest(`${API_URL}/${projectId}/recalc-progress`, {
+    method: "POST",
+  });
+}

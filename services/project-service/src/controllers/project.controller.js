@@ -243,3 +243,43 @@ export const updateProjectStatus = async (req, res) => {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
 };
+
+//cập nhật tiến độ dự án
+export const recalcProjectProgress = async (req, res) => {
+  try {
+    const { id: projectId } = req.params;
+
+    // ✅ Gọi đúng route
+    const { data: tasks } = await http.task.get(`/project/${projectId}`, {
+      headers: { Authorization: req.headers.authorization }
+    });
+
+    if (!tasks || tasks.length === 0) {
+      const updated = await Project.findByIdAndUpdate(
+        projectId,
+        { progress: 0, updated_at: new Date() },
+        { new: true }
+      );
+      return res.json({ progress: 0, project: updated });
+    }
+
+    // 🧮 Tính trung bình progress
+    const totalProgress = tasks.reduce((sum, t) => sum + (t.progress || 0), 0);
+    const avgProgress = Math.round(totalProgress / tasks.length);
+
+    const updated = await Project.findByIdAndUpdate(
+      projectId,
+      { progress: avgProgress, updated_at: new Date() },
+      { new: true }
+    );
+
+    res.json({ progress: avgProgress, project: updated });
+  } catch (error) {
+    console.error('❌ Lỗi recalcProjectProgress:', error.message);
+    res.status(500).json({
+      message: 'Lỗi tính lại tiến độ dự án',
+      error: error.message
+    });
+  }
+};
+

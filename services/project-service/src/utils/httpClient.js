@@ -16,7 +16,12 @@ const http = {
   activity: axios.create({
     baseURL: 'http://activity-service:5007/api/activity-logs',
     timeout: 5000
-  })
+  }),
+
+  task: axios.create({
+    baseURL: 'http://task-service:5004/api/tasks', // 📡 Task Service
+    timeout: 5000
+  }),
 
 };
 
