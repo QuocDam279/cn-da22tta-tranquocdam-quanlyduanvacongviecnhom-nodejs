@@ -1,29 +1,9 @@
 // src/components/dashboard/ProjectList.jsx
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { useNavigate } from "react-router-dom";
-import { getMyProjects } from "../../services/projectService";
 
-export default function ProjectList() {
+export default function ProjectList({ projects = [], loading = false }) {
   const navigate = useNavigate();
-  const [projects, setProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchProjects() {
-      try {
-        setLoading(true);
-        const data = await getMyProjects();
-        setProjects(data || []);
-      } catch (err) {
-        console.error("Lỗi lấy danh sách dự án:", err);
-        setProjects([]);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchProjects();
-  }, []);
 
   const displayedProjects = projects.slice(0, 9);
 
@@ -58,8 +38,7 @@ export default function ProjectList() {
             ))}
           </div>
 
-          {/* Nút Xem thêm */}
-          {projects.length > 5 && (
+          {projects.length > 9 && (
             <div className="mt-4 text-center">
               <button
                 onClick={() => navigate("/duan")}

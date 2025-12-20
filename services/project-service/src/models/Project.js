@@ -6,11 +6,6 @@ const projectSchema = new mongoose.Schema({
   description: { type: String },
   start_date: { type: Date },
   end_date: { type: Date },
-  status: { 
-    type: String, 
-    enum: ['Planned', 'In Progress', 'Completed', 'On Hold'], 
-    default: 'Planned' 
-  },
   progress: { type: Number, min: 0, max: 100, default: 0 },
   created_by: { type: mongoose.Schema.Types.ObjectId, required: true },
   created_at: { type: Date, default: Date.now },
@@ -18,4 +13,4 @@ const projectSchema = new mongoose.Schema({
 });
 
 const Project = mongoose.model('Project', projectSchema);
-export default Project; // ✅ export default đúng chuẩn ESM
+export default Project;

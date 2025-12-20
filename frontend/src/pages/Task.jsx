@@ -1,93 +1,76 @@
 // pages/Task.jsx
-import React, { useState, useEffect } from "react";
-import Menu from "../components/common/Menu";
-import Header from "../components/common/Header";
+import React from "react";
 import TaskDragDrop from "../components/task/TaskDragDrop";
 import TaskItem from "../components/task/TaskItem";
-import { getMyTasks, getTaskStats, updateTask } from "../services/taskService";
+
+// Hooks
+import { useMyTasks, useTaskStats, useUpdateTask } from "../hooks/useTasks";
 
 export default function Task() {
-  const [collapsed, setCollapsed] = useState(false);
-  const [tasks, setTasks] = useState([]);
-  const [stats, setStats] = useState(null); // ✅ Thêm state stats
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  // ✅ Fetch tasks
+  const {
+    data: tasks = [],
+    isLoading: loading,
+    error: taskError,
+  } = useMyTasks();
 
-  const sidebarWidth = collapsed ? "4rem" : "16rem";
+  // ✅ Fetch stats (nếu sau này cần hiển thị)
+  const { data: stats } = useTaskStats();
 
-  const fetchTasks = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getMyTasks();
-      setTasks(data);
-    } catch (err) {
-      setError("Lỗi khi tải công việc");
-      console.error("Error fetching tasks:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchStats = async () => {
-    try {
-      const data = await getTaskStats();
-      setStats(data);
-    } catch (err) {
-      console.error("Error fetching stats:", err);
-    }
-  };
+  // ✅ Update task mutation
+  const updateTaskMutation = useUpdateTask();
 
   const handleTaskUpdated = async (taskId, payload) => {
     try {
-      await updateTask(taskId, payload);
-      // Fetch lại cả tasks và stats sau khi update
-      await Promise.all([fetchTasks(), fetchStats()]);
+      await updateTaskMutation.mutateAsync({ taskId, payload });
+      // React Query tự invalidate & refetch
     } catch (err) {
-      setError("Lỗi khi cập nhật công việc");
       console.error("Error updating task:", err);
       throw err;
     }
   };
 
-  useEffect(() => {
-    fetchTasks();
-    fetchStats();
-  }, []);
-
   return (
-    <div className="bg-gray-50 min-h-screen flex">
-      <Menu collapsed={collapsed} setCollapsed={setCollapsed} />
+    <div className="bg-gray-50 min-h-screen px-6 py-10">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Error khi load task */}
+        {taskError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            {taskError.message || "Lỗi khi tải công việc"}
+          </div>
+        )}
 
-      <div className="flex-1">
-        <Header collapsed={collapsed} sidebarWidth={sidebarWidth} />
+        {/* Error khi update */}
+        {updateTaskMutation.isError && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+            Lỗi khi cập nhật công việc
+          </div>
+        )}
 
-        <div
-          className="pt-24 px-6 space-y-8 transition-all duration-300"
-          style={{ marginLeft: sidebarWidth }}
-        >
-          <h1 className="text-2xl font-bold text-gray-800 mb-2">
-            Công việc của tôi
-          </h1>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-              {error}
+        {/* Loading */}
+        {loading ? (
+          <div className="flex justify-center items-center py-16">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-3"></div>
+              <div className="text-gray-600">Đang tải công việc...</div>
             </div>
-          )}
-
-          {loading ? (
-            <div className="flex justify-center items-center py-12">
-              <div className="text-gray-500">Đang tải...</div>
-            </div>
-          ) : (
-            <TaskDragDrop 
-              tasks={tasks} 
-              onTaskUpdated={handleTaskUpdated}
-              TaskItemComponent={TaskItem}
-            />
-          )}
-        </div>
+          </div>
+        ) : tasks.length === 0 ? (
+          <div className="bg-white rounded-lg border border-gray-200 p-12 text-center">
+            <p className="text-gray-600 text-lg mb-2">
+              Chưa có công việc nào
+            </p>
+            <p className="text-sm text-gray-400">
+              Bạn sẽ thấy các công việc được giao tại đây
+            </p>
+          </div>
+        ) : (
+          <TaskDragDrop
+            tasks={tasks}
+            onTaskUpdated={handleTaskUpdated}
+            TaskItemComponent={TaskItem}
+          />
+        )}
       </div>
     </div>
   );

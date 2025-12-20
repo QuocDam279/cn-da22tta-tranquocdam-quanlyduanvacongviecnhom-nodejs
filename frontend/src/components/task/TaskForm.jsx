@@ -1,8 +1,16 @@
+// ========================================
+// 1. TaskForm.jsx - IMPROVED
+// ========================================
 import React, { useState } from "react";
-import { X, Calendar, Flag, Users, FileText, Plus } from "lucide-react";
-import { createTask } from "../../services/taskService";
+import { X, Plus, Calendar, User, Flag, FileText } from "lucide-react";
+import { useCreateTask } from "../../hooks/useTasks";
 
-export default function TaskForm({ onClose, projectId, members = [], onTaskCreated }) {
+export default function TaskForm({
+  onClose,
+  projectId,
+  members = [],
+  onTaskCreated,
+}) {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const [taskName, setTaskName] = useState("");
@@ -11,26 +19,32 @@ export default function TaskForm({ onClose, projectId, members = [], onTaskCreat
   const [assignedTo, setAssignedTo] = useState("");
   const [startDate, setStartDate] = useState(todayStr);
   const [dueDate, setDueDate] = useState("");
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
   const priorities = {
-    Low: { label: "Thấp", color: "bg-green-500" },
-    Medium: { label: "Trung bình", color: "bg-yellow-500" },
-    High: { label: "Cao", color: "bg-red-500" }
+    Low: { label: "Thấp", color: "bg-emerald-500", hoverColor: "hover:bg-emerald-600" },
+    Medium: { label: "Trung bình", color: "bg-amber-500", hoverColor: "hover:bg-amber-600" },
+    High: { label: "Cao", color: "bg-rose-500", hoverColor: "hover:bg-rose-600" },
   };
+
+  const createTaskMutation = useCreateTask();
+  const isSubmitting = createTaskMutation.isPending;
 
   const handleCreate = async () => {
     setError("");
-    if (!taskName.trim()) return setError("Vui lòng nhập tên công việc!");
-    if (!assignedTo) return setError("Vui lòng chọn người được giao!");
+
+    if (!taskName.trim()) {
+      return setError("Vui lòng nhập tên công việc!");
+    }
+    if (!assignedTo) {
+      return setError("Vui lòng chọn người được giao!");
+    }
     if (startDate && dueDate && startDate > dueDate) {
       return setError("Ngày kết thúc phải sau ngày bắt đầu!");
     }
 
-    setIsSubmitting(true);
     try {
-      await createTask({
+      await createTaskMutation.mutateAsync({
         task_name: taskName,
         description,
         priority,
@@ -39,93 +53,120 @@ export default function TaskForm({ onClose, projectId, members = [], onTaskCreat
         start_date: startDate || null,
         due_date: dueDate || null,
       });
-      if (onTaskCreated) onTaskCreated();
+
+      onTaskCreated?.();
       onClose();
     } catch (err) {
-      setError(err.response?.data?.message || "Tạo công việc thất bại!");
-    } finally {
-      setIsSubmitting(false);
+      setError(err?.message || "Tạo công việc thất bại!");
     }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-2xl font-bold">Tạo công việc mới</h2>
-          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-lg">
-            <X size={20} />
-          </button>
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-scale-in">
+        {/* HEADER với gradient */}
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 border-b border-gray-200 rounded-t-2xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                <Plus className="text-white" size={22} />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-800">Tạo công việc mới</h2>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/50 rounded-lg transition-colors"
+            >
+              <X size={22} className="text-gray-600" />
+            </button>
+          </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-4 overflow-y-auto">
+        {/* CONTENT */}
+        <div className="p-6 space-y-5 overflow-y-auto flex-1">
           {error && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-              {error}
+            <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm animate-shake">
+              <span className="text-xl">⚠️</span>
+              <span>{error}</span>
             </div>
           )}
 
-          {/* Tên */}
+          {/* Tên công việc */}
           <div>
-            <label className="block text-sm font-medium mb-2">Tên công việc *</label>
+            <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700">
+              <FileText size={16} className="text-blue-500" />
+              Tên công việc *
+            </label>
             <input
               type="text"
               value={taskName}
               onChange={(e) => setTaskName(e.target.value)}
               placeholder="Nhập tên công việc..."
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
             />
           </div>
 
           {/* Mô tả */}
           <div>
-            <label className="block text-sm font-medium mb-2">Mô tả</label>
+            <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700">
+              <FileText size={16} className="text-purple-500" />
+              Mô tả
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Thêm mô tả..."
               rows={3}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none"
+              placeholder="Thêm mô tả chi tiết..."
+              className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all resize-none"
             />
           </div>
 
-          {/* Dates */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Ngày */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Ngày bắt đầu</label>
+              <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700">
+                <Calendar size={16} className="text-blue-500" />
+                Ngày bắt đầu
+              </label>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium mb-2">Ngày kết thúc</label>
+              <label className="flex items-center gap-2 text-sm font-semibold mb-2 text-gray-700">
+                <Calendar size={16} className="text-purple-500" />
+                Ngày kết thúc
+              </label>
               <input
                 type="date"
                 value={dueDate}
                 min={startDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all"
               />
             </div>
           </div>
 
           {/* Priority */}
           <div>
-            <label className="block text-sm font-medium mb-2">Độ ưu tiên</label>
-            <div className="flex gap-2">
-              {Object.entries(priorities).map(([key, { label, color }]) => (
+            <label className="flex items-center gap-2 text-sm font-semibold mb-3 text-gray-700">
+              <Flag size={16} className="text-rose-500" />
+              Độ ưu tiên
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {Object.entries(priorities).map(([key, { label, color, hoverColor }]) => (
                 <button
                   key={key}
+                  type="button"
                   onClick={() => setPriority(key)}
-                  className={`flex-1 py-2 px-3 rounded-lg border-2 font-medium transition ${
+                  className={`py-3 px-4 rounded-xl border-2 font-semibold transition-all transform ${
                     priority === key
-                      ? `${color} text-white border-transparent`
-                      : "bg-white border-gray-300 hover:border-gray-400"
+                      ? `${color} text-white border-transparent shadow-lg scale-105`
+                      : `bg-white border-gray-200 text-gray-700 hover:border-gray-300 hover:shadow-md`
                   }`}
                 >
                   {label}
@@ -134,35 +175,67 @@ export default function TaskForm({ onClose, projectId, members = [], onTaskCreat
             </div>
           </div>
 
-          {/* Members */}
+          {/* Thành viên */}
           <div>
-            <label className="block text-sm font-medium mb-2">Giao cho *</label>
-            <div className="border rounded-lg p-2 max-h-48 overflow-y-auto space-y-2">
+            <label className="flex items-center gap-2 text-sm font-semibold mb-3 text-gray-700">
+              <User size={16} className="text-indigo-500" />
+              Giao cho *
+            </label>
+            <div className="border-2 border-gray-200 rounded-xl p-3 max-h-56 overflow-y-auto space-y-2">
               {members.length === 0 ? (
-                <p className="text-gray-500 text-sm text-center py-4">Chưa có thành viên</p>
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <User size={28} className="text-gray-400" />
+                  </div>
+                  <p className="text-gray-500 text-sm font-medium">Chưa có thành viên</p>
+                </div>
               ) : (
                 members.map((m) => {
                   const user = m.user;
                   if (!user) return null;
+
                   const selected = assignedTo === user._id;
+
                   return (
                     <div
                       key={user._id}
                       onClick={() => setAssignedTo(user._id)}
-                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition ${
-                        selected ? "bg-blue-100 border-2 border-blue-500" : "hover:bg-gray-50"
+                      className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all ${
+                        selected
+                          ? "bg-gradient-to-r from-blue-50 to-purple-50 border-2 border-blue-500 shadow-md"
+                          : "hover:bg-gray-50 border-2 border-transparent"
                       }`}
                     >
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold ${
-                        selected ? "bg-blue-600" : "bg-gray-400"
-                      }`}>
+                      <div
+                        className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm shadow-md ${
+                          selected ? "bg-gradient-to-br from-blue-500 to-purple-500" : "bg-gray-400"
+                        }`}
+                      >
                         {user.full_name?.[0]?.toUpperCase() || "?"}
                       </div>
+
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{user.full_name || "Unknown"}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                        <p className="font-semibold text-gray-800 truncate">
+                          {user.full_name || "Unknown"}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {user.email}
+                        </p>
                       </div>
-                      {selected && <Check size={20} className="text-blue-600" />}
+
+                      {selected && (
+                        <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path
+                              d="M5 13l4 4L19 7"
+                              stroke="white"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
+                        </div>
+                      )}
                     </div>
                   );
                 })
@@ -171,42 +244,54 @@ export default function TaskForm({ onClose, projectId, members = [], onTaskCreat
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex justify-end gap-3 p-6 border-t bg-gray-50">
+        {/* FOOTER */}
+        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50 rounded-b-2xl">
           <button
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-100 disabled:opacity-50"
+            className="px-6 py-3 border-2 border-gray-300 rounded-xl font-semibold text-gray-700 hover:bg-gray-100 disabled:opacity-50 transition-all"
           >
             Hủy
           </button>
+
           <button
             onClick={handleCreate}
             disabled={isSubmitting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 shadow-lg hover:shadow-xl transition-all flex items-center gap-2"
           >
             {isSubmitting ? (
               <>
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 Đang tạo...
               </>
             ) : (
               <>
-                <Plus size={18} />
-                Tạo
+                <Plus size={20} />
+                Tạo công việc
               </>
             )}
           </button>
         </div>
       </div>
-    </div>
-  );
-}
 
-function Check({ size, className }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" className={className}>
-      <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
+      <style jsx>{`
+        @keyframes fade-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes scale-in {
+          from { transform: scale(0.95); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
+        }
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-5px); }
+          75% { transform: translateX(5px); }
+        }
+        .animate-fade-in { animation: fade-in 0.2s ease-out; }
+        .animate-scale-in { animation: scale-in 0.3s ease-out; }
+        .animate-shake { animation: shake 0.3s ease-out; }
+      `}</style>
+    </div>
   );
 }

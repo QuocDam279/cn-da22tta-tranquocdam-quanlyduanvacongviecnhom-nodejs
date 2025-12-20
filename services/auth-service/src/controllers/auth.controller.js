@@ -12,7 +12,16 @@ export const register = async (req, res) => {
     const user = await User.create({ full_name, email, password });
     const token = generateToken(user);
 
-    res.status(201).json({ message: 'Đăng ký thành công', token, user });
+    // Không trả password về client
+    const userResponse = {
+      _id: user._id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar: user.avatar,
+      created_at: user.created_at
+    };
+
+    res.status(201).json({ message: 'Đăng ký thành công', token, user: userResponse });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
@@ -32,7 +41,18 @@ export const login = async (req, res) => {
     await user.save();
 
     const token = generateToken(user);
-    res.json({ message: 'Đăng nhập thành công', token, user });
+    
+    // Không trả password về client
+    const userResponse = {
+      _id: user._id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar: user.avatar,
+      created_at: user.created_at,
+      last_login: user.last_login
+    };
+
+    res.json({ message: 'Đăng nhập thành công', token, user: userResponse });
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }

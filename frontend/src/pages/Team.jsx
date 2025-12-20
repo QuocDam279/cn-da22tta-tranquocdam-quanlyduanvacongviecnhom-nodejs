@@ -1,32 +1,17 @@
-import React, { useState } from "react";
-import Menu from "../components/common/Menu";
+import React from "react";
 import Header from "../components/common/Header";
 import DashboardTeam from "../components/team/DashboardTeam";
 
 export default function Team() {
-  const [collapsed, setCollapsed] = useState(false);
-
-  // Chiều rộng sidebar theo trạng thái
-  const sidebarWidth = collapsed ? "4rem" : "16rem";
-
   return (
-    <div className="bg-white min-h-screen flex">
-      {/* Menu */}
-      <Menu collapsed={collapsed} setCollapsed={setCollapsed} />
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+      {/* Header */}
+      <Header />
 
-      {/* Main content */}
-      <div className="flex-1">
-        {/* Header */}
-        <Header collapsed={collapsed} sidebarWidth={sidebarWidth} />
-        {/* Content */}
-        <div
-          className="pt-24 px-6 space-y-8 transition-all duration-300"
-          style={{ marginLeft: sidebarWidth }}
-        >
-          <DashboardTeam />
-          </div>
-      </div>
-
+      {/* Content */}
+      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <DashboardTeam />
+      </main>
     </div>
   );
 }

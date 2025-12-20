@@ -1,5 +1,6 @@
 // src/App.jsx
 import { Routes, Route, Navigate } from "react-router-dom";
+import { Toaster } from "react-hot-toast"; // ✅ Import Toaster
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -10,6 +11,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import Task from "./pages/Task";
 import TaskDetail from "./pages/TaskDetail";
 import Activity from "./pages/Activity";
+import UserProfilePage from "./pages/UserProfilePage";
 
 function RequireAuth({ children }) {
   const token = localStorage.getItem("token");
@@ -19,27 +21,115 @@ function RequireAuth({ children }) {
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Navigate to="/login" />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+    <>
+      {/* ✅ Thêm Toaster cho notifications */}
+      <Toaster 
+        position="top-right"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
+            },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
+            },
+          },
+        }}
+      />
 
-      <Route path="/tongquan" element={<RequireAuth><Dashboard /></RequireAuth>} />
+      <Routes>
+        <Route path="/" element={<Navigate to="/login" />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
 
-      <Route path="/nhom" element={<RequireAuth><Team /></RequireAuth>} />
-      <Route path="/nhom/:id" element={<RequireAuth><TeamDetail /></RequireAuth>} />
+        <Route
+          path="/tongquan"
+          element={
+            <RequireAuth>
+              <Dashboard />
+            </RequireAuth>
+          }
+        />
 
-      <Route path="/duan" element={<RequireAuth><Project /></RequireAuth>} />
-      <Route path="/duan/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
+        <Route
+          path="/nhom"
+          element={
+            <RequireAuth>
+              <Team />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/nhom/:id"
+          element={
+            <RequireAuth>
+              <TeamDetail />
+            </RequireAuth>
+          }
+        />
 
-      <Route path="/congviec" element={<RequireAuth><Task /></RequireAuth>} />
-      <Route path="/congviec/:id" element={<RequireAuth><TaskDetail /></RequireAuth>} />
+        <Route
+          path="/duan"
+          element={
+            <RequireAuth>
+              <Project />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/duan/:id"
+          element={
+            <RequireAuth>
+              <ProjectDetail />
+            </RequireAuth>
+          }
+        />
 
-      <Route path="/nhatkyhoatdong" element={<RequireAuth><Activity /></RequireAuth>} />
+        <Route
+          path="/congviec"
+          element={
+            <RequireAuth>
+              <Task />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/congviec/:id"
+          element={
+            <RequireAuth>
+              <TaskDetail />
+            </RequireAuth>
+          }
+        />
 
+        <Route
+          path="/nhatkyhoatdong"
+          element={
+            <RequireAuth>
+              <Activity />
+            </RequireAuth>
+          }
+        />
 
-
-    </Routes>
+        <Route
+          path="/profile"
+          element={
+            <RequireAuth>
+              <UserProfilePage />
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </>
   );
 }
 

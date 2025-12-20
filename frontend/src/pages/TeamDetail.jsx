@@ -1,167 +1,227 @@
 // src/components/team/TeamDetail.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
-import Menu from "../components/common/Menu";
 import Header from "../components/common/Header";
 import TeamInfo from "../components/team/TeamInfo";
 import TeamMembers from "../components/team/TeamMembers";
-import TabsContainer from "../components/common/TabsContainer";
 import ProjectList from "../components/project/ProjectList";
 import CreateProjectButton from "../components/project/CreateProjectButton";
-import { getTeamById } from "../services/teamService";
-import { getProjectsByTeam } from "../services/projectService";
-import { getTasksByProject } from "../services/taskService";
 import { ArrowLeft } from "lucide-react";
+
+// Import hooks
+import { useTeamDetail } from "../hooks/useTeams";
+import { useProjectsByTeam } from "../hooks/useProjects";
 
 export default function TeamDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [collapsed, setCollapsed] = useState(false);
-  const [team, setTeam] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [activeTab, setActiveTab] = useState("members");
+  
+  const userId = localStorage.getItem("userId");
 
-  const [projects, setProjects] = useState([]);
-  const [loadingProjects, setLoadingProjects] = useState(false);
-  const [projectError, setProjectError] = useState("");
+  // ✅ Sử dụng React Query hooks
+  const {
+    data: teamData,
+    isLoading: loadingTeam,
+    error: teamError,
+  } = useTeamDetail(id);
 
-  const [activeTab, setActiveTab] = useState("members"); // 'members' | 'projects'
-  const sidebarWidth = collapsed ? "4rem" : "16rem";
+  const {
+    data: projects = [],
+    isLoading: loadingProjects,
+    error: projectError,
+  } = useProjectsByTeam(teamData?.team?._id);
 
-  // ---------- Fetch team ----------
-  const fetchTeam = async () => {
-    setLoading(true);
-    setError("");
-    try {
-      const data = await getTeamById(id);
-      const userId = localStorage.getItem("userId");
-      const userRole = data.team.created_by === userId ? "leader" : "member";
-      data.currentUserRole = userRole;
-      setTeam(data);
-    } catch (err) {
-      setError(err.message || "Lỗi khi tải chi tiết nhóm");
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Xác định role của user hiện tại
+  const currentUserRole = useMemo(() => {
+    if (!teamData?.team) return "member";
+    return teamData.team.created_by === userId ? "leader" : "member";
+  }, [teamData?.team, userId]);
 
-  // ---------- Fetch projects ----------
-  const fetchProjects = async (teamId) => {
-    setLoadingProjects(true);
-    setProjectError("");
-    try {
-      const data = await getProjectsByTeam(teamId);
-      const projectsWithTasks = await Promise.all(
-        data.map(async (project) => {
-          try {
-            const tasks = await getTasksByProject(project._id);
-            return { ...project, tasks };
-          } catch {
-            return { ...project, tasks: [] };
-          }
-        })
-      );
-      setProjects(projectsWithTasks);
-    } catch (err) {
-      setProjectError(err.message || "Lỗi khi tải danh sách dự án");
-    } finally {
-      setLoadingProjects(false);
-    }
-  };
+  // Combine teamData với role
+  const team = useMemo(() => {
+    if (!teamData) return null;
+    return {
+      ...teamData,
+      currentUserRole,
+    };
+  }, [teamData, currentUserRole]);
 
-  useEffect(() => {
-    fetchTeam();
-  }, [id]);
-
-  useEffect(() => {
-    if (team?.team?._id) fetchProjects(team.team._id);
-  }, [team?.team?._id]);
-
-  const handleMembersUpdated = (newMembers) =>
-    setTeam((prev) => ({ ...prev, members: newMembers }));
-
-  const handleProjectCreated = (newProject) =>
-    setProjects((prev) => [newProject, ...prev]);
+  const TABS = [
+    { key: "members", label: "Thành viên" },
+    { key: "projects", label: "Dự án" },
+  ];
 
   return (
-    <div className="bg-white min-h-screen flex">
-      <Menu collapsed={collapsed} setCollapsed={setCollapsed} />
-      <div className="flex-1">
-        <Header collapsed={collapsed} sidebarWidth={sidebarWidth} />
-        <div
-          className="pt-20 px-6 space-y-8 transition-all duration-300 mb-6"
-          style={{ marginLeft: sidebarWidth }}
-        >
-          {loading ? (
-            <p>Đang tải chi tiết nhóm...</p>
-          ) : error ? (
-            <p className="text-red-500">{error}</p>
-          ) : team ? (
-            <>
-            {/* Breadcrumb */}
-            <div className="text-sm text-gray-500 mb-4 flex items-center gap-2">
-              {/* Icon quay lại */}
-              <Link
-                to="/nhom"
-                className="flex items-center gap-1 hover:text-blue-600 transition-colors"
-              >
-                <ArrowLeft size={16} />
-                <span className="font-medium">Nhóm</span>
-              </Link>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+      {/* Header */}
+      <Header />
 
-              {/* TeamInfo kèm TeamActions */}
+      {/* Main Content */}
+      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
+        {/* Loading state */}
+        {loadingTeam ? (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12">
+            <div className="flex justify-center items-center">
+              <div className="text-center space-y-3">
+                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                <p className="text-gray-500 font-medium">Đang tải chi tiết nhóm...</p>
+              </div>
+            </div>
+          </div>
+        ) : teamError ? (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12">
+            <div className="flex justify-center items-center">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-3xl">⚠️</span>
+                </div>
+                <p className="text-red-600 font-medium">
+                  {teamError.message || "Lỗi khi tải chi tiết nhóm"}
+                </p>
+                <p className="text-gray-500 text-sm">Vui lòng thử lại sau</p>
+              </div>
+            </div>
+          </div>
+        ) : team ? (
+          <>
+            {/* Breadcrumb */}
+            <Link
+              to="/nhom"
+              className="inline-flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors group"
+            >
+              <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+              <span className="font-medium">Quay lại danh sách nhóm</span>
+            </Link>
+
+            {/* TeamInfo Card */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-fade-in">
               <TeamInfo
                 team={team.team}
                 members={team.members}
                 currentUserRole={team.currentUserRole}
-                onUpdated={(updatedTeam) =>
-                  setTeam((prev) => ({ ...prev, team: updatedTeam }))
-                }
+                onUpdated={() => {
+                  // React Query sẽ tự động refetch
+                }}
                 onDeleted={() => navigate("/nhom")}
               />
+            </div>
 
-              {/* Tabs: Thành viên & Dự án */}
-              <TabsContainer
-                tabs={[
-                  { key: "members", label: "Thành viên" },
-                  { key: "projects", label: "Dự án" },
-                ]}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              >
-                {activeTab === "members" && (
-                  <TeamMembers
-                    teamId={team.team._id}
-                    members={team.members}
-                    currentUserId={localStorage.getItem("userId")}
-                    currentUserRole={team.currentUserRole}
-                    onMembersUpdated={handleMembersUpdated}
-                  />
-                )}
-
-                {activeTab === "projects" && (
-                  <div className="space-y-4">
-                    {team.currentUserRole === "leader" && (
-                      <CreateProjectButton
-                        teamId={team.team._id}
-                        onCreated={handleProjectCreated}
-                      />
+            {/* Tabs Container */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-fade-in">
+              {/* Tab Navigation */}
+              <div className="flex border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white overflow-x-auto">
+                {TABS.map((tab, index) => (
+                  <React.Fragment key={tab.key}>
+                    <button
+                      onClick={() => setActiveTab(tab.key)}
+                      className={`relative px-6 py-4 text-sm font-semibold transition-all duration-300 whitespace-nowrap
+                        ${
+                          activeTab === tab.key
+                            ? "text-blue-600"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                        }`}
+                    >
+                      {tab.label}
+                      {activeTab === tab.key && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-t-full"></div>
+                      )}
+                    </button>
+                    {index < TABS.length - 1 && (
+                      <div className="w-px bg-gray-200 my-3"></div>
                     )}
-                    <ProjectList
-                      projects={projects}
-                      loading={loadingProjects}
-                      error={projectError}
+                  </React.Fragment>
+                ))}
+              </div>
+
+              {/* Tab Content */}
+              <div className="p-6 lg:p-8">
+                {activeTab === "members" && (
+                  <div className="animate-fade-in">
+                    <TeamMembers
+                      teamId={team.team._id}
+                      members={team.members}
+                      currentUserId={userId}
+                      currentUserRole={team.currentUserRole}
+                      onMembersUpdated={() => {
+                        // React Query sẽ tự động refetch
+                      }}
                     />
                   </div>
                 )}
-              </TabsContainer>
-            </>
-          ) : (
-            <p>Không tìm thấy nhóm</p>
-          )}
-        </div>
-      </div>
+
+                {activeTab === "projects" && (
+                  <div className="space-y-6 animate-fade-in">
+                    {team.currentUserRole === "leader" && (
+                      <CreateProjectButton
+                        teamId={team.team._id}
+                        onCreated={() => {
+                          // React Query sẽ tự động refetch
+                        }}
+                      />
+                    )}
+                    
+                    {loadingProjects ? (
+                      <div className="flex justify-center items-center h-48">
+                        <div className="text-center space-y-3">
+                          <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
+                          <p className="text-gray-500 font-medium">Đang tải dự án...</p>
+                        </div>
+                      </div>
+                    ) : projectError ? (
+                      <div className="flex justify-center items-center h-48">
+                        <div className="text-center space-y-3">
+                          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
+                            <span className="text-3xl">⚠️</span>
+                          </div>
+                          <p className="text-red-600 font-medium">
+                            {projectError.message || "Lỗi khi tải dự án"}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <ProjectList
+                        projects={projects}
+                        loading={false}
+                        error=""
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12">
+            <div className="flex justify-center items-center">
+              <div className="text-center space-y-3">
+                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-3xl">📋</span>
+                </div>
+                <p className="text-yellow-800 font-medium">Không tìm thấy nhóm</p>
+                <p className="text-gray-500 text-sm">Nhóm có thể đã bị xóa hoặc bạn không có quyền truy cập</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      {/* Custom Animations */}
+      <style jsx>{`
+        @keyframes fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out;
+        }
+      `}</style>
     </div>
   );
 }

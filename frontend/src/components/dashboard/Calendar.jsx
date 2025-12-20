@@ -261,13 +261,13 @@ export default function Calendar({ tasks = [] }) {
               </div>
             ) : (
               <div className="text-center text-gray-500 py-8">
-                Không có task nào trong ngày này
+                Không có công việc nào trong ngày này
               </div>
             )}
           </>
         ) : (
           <div className="text-center text-gray-500 py-8">
-            Click vào một ngày để xem chi tiết tasks
+            Chọn một ngày để các công việc
           </div>
         )}
       </div>

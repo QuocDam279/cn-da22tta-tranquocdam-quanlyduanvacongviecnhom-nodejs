@@ -1,8 +1,13 @@
+// src/components/project/ProjectCard.jsx
 import { useNavigate } from "react-router-dom";
 import { Calendar } from "lucide-react";
+import { useTasksByProject } from "../../hooks/useTasks";
 
 export default function ProjectCard({ project }) {
   const navigate = useNavigate();
+
+  // ✅ Fetch tasks bằng React Query hook
+  const { data: tasks = [], isLoading: loadingTasks } = useTasksByProject(project._id);
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "-";
@@ -50,8 +55,10 @@ export default function ProjectCard({ project }) {
       <div className="px-3 pb-3 text-xs text-gray-700 space-y-1">
         <p className="font-medium text-gray-600 mb-1">Công việc:</p>
 
-        {project.tasks?.length > 0 ? (
-          project.tasks.slice(0, 3).map((task) => (
+        {loadingTasks ? (
+          <p className="text-gray-400">Đang tải...</p>
+        ) : tasks.length > 0 ? (
+          tasks.slice(0, 3).map((task) => (
             <p key={task._id} className="truncate">• {task.task_name}</p>
           ))
         ) : (

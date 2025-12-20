@@ -1,28 +1,33 @@
-// components/task/CreateTaskButton.jsx
+// ========================================
+// 2. CreateTaskButton.jsx - IMPROVED
+// ========================================
 import React, { useState } from "react";
+import { Plus } from "lucide-react";
 import TaskForm from "./TaskForm";
 
 export default function CreateTaskButton({ projectId, onCreated, members = [] }) {
   const [showForm, setShowForm] = useState(false);
 
-  const handleClose = () => setShowForm(false);
-
   return (
     <>
       <button
         onClick={() => setShowForm(true)}
-        className="fixed bottom-6 right-6 bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg hover:bg-blue-700 transition"
+        className="fixed bottom-8 right-8 bg-gradient-to-r from-blue-500 to-purple-500 text-white px-6 py-4 rounded-2xl shadow-2xl hover:shadow-3xl hover:from-blue-600 hover:to-purple-600 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-3 font-semibold group z-40"
       >
-        + Tạo công việc
+        <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:rotate-90 transition-transform">
+          <Plus size={20} />
+        </div>
+        <span>Tạo công việc</span>
       </button>
 
       {showForm && (
         <TaskForm
           projectId={projectId}
           members={members}
-          onClose={() => {
-            handleClose();
+          onClose={() => setShowForm(false)}
+          onTaskCreated={() => {
             onCreated?.();
+            setShowForm(false);
           }}
         />
       )}

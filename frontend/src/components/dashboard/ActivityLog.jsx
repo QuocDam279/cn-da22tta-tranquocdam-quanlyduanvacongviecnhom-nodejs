@@ -1,44 +1,8 @@
-import { useEffect, useState } from 'react';
-import { getMyActivities } from '../../services/activityService';
+// src/components/dashboard/ActivityLog.jsx (hoặc UserActivities.jsx)
+import { useActivities } from '../../hooks/useDashboardData';
 import { Clock } from 'lucide-react';
 
-const UserActivities = () => {
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  const getUserId = () => {
-    const token = localStorage.getItem('token');
-    if (!token) return null;
-    try {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      return payload.user_id || payload.id;
-    } catch {
-      return null;
-    }
-  };
-
-  const fetchActivities = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const userId = getUserId();
-      if (!userId) throw new Error('User không hợp lệ');
-
-      const response = await getMyActivities({ limit: 5, page: 1 });
-      setActivities(response.data || []);
-    } catch (err) {
-      setError(err.message);
-      setActivities([]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchActivities();
-  }, []);
-
+const UserActivities = ({ activities, loading }) => {
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -59,13 +23,15 @@ const UserActivities = () => {
       <h1 className="text-xl font-semibold text-gray-800 mb-4">Nhật ký hoạt động</h1>
 
       {loading && <p className="text-gray-500 animate-pulse">Đang tải...</p>}
-      {error && <p className="text-red-500">{error}</p>}
-      {!loading && !error && activities.length === 0 && <p className="text-gray-500">Chưa có hoạt động nào</p>}
+      
+      {!loading && activities.length === 0 && (
+        <p className="text-gray-500">Chưa có hoạt động nào</p>
+      )}
 
       <div className="space-y-4">
         {activities.map((activity, index) => (
           <div
-            key={index}
+            key={activity._id || index}
             className="flex items-start bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow-lg transition-shadow duration-200"
           >
             <div className="flex-1">

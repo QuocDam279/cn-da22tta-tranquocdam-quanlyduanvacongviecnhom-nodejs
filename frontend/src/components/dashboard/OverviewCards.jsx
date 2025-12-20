@@ -1,59 +1,25 @@
-import React, { useEffect, useState } from "react";
 import { Users, FolderKanban, ListTodo, AlarmClock } from "lucide-react";
 
-import { getMyTeams } from "../../services/teamService";
-import { getMyProjects } from "../../services/projectService";
-import { getMyTasks } from "../../services/taskService";
+export default function OverviewCards({
+  teams = [],
+  projects = [],
+  tasks = [],
+  loading = false,
+}) {
+  const teamCount = teams.length;
+  const projectCount = projects.length;
+  const taskCount = tasks.length;
 
-export default function OverviewCards() {
-  const [teamCount, setTeamCount] = useState(0);
-  const [projectCount, setProjectCount] = useState(0);
-  const [taskCount, setTaskCount] = useState(0);
-  const [upcomingCount, setUpcomingCount] = useState(0);
+  // 🔥 Sắp đến hạn (3 ngày)
+  const now = new Date();
+  const limit = new Date();
+  limit.setDate(limit.getDate() + 3);
 
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [teams, projects, tasks] = await Promise.all([
-          getMyTeams(),
-          getMyProjects(),
-          getMyTasks()
-        ]);
-
-        setTeamCount(teams?.length || 0);
-        setProjectCount(projects?.length || 0);
-        setTaskCount(tasks?.length || 0);
-
-        // 🔥 Sắp đến hạn (deadline 3 ngày gần nhất)
-        const now = new Date();
-        const limit = new Date();
-        limit.setDate(limit.getDate() + 3);
-
-        const upcoming = tasks.filter((t) => {
-          if (!t.due_date) return false;
-          const date = new Date(t.due_date);
-          return (
-            date >= now &&
-            date <= limit &&
-            t.status !== "Đã hoàn thành"
-          );
-        });
-
-        setUpcomingCount(upcoming.length);
-      } catch (err) {
-        setTeamCount(0);
-        setProjectCount(0);
-        setTaskCount(0);
-        setUpcomingCount(0);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
+  const upcomingCount = tasks.filter((t) => {
+    if (!t.due_date) return false;
+    const date = new Date(t.due_date);
+    return date >= now && date <= limit && t.status !== "Đã hoàn thành";
+  }).length;
 
   const cards = [
     {

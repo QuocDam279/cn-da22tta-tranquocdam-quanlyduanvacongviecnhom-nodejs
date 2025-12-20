@@ -45,6 +45,65 @@ export const authProxy = createProxyMiddleware({
 });
 
 // ----------------------------
+// USER PROXY (✅ THÊM MỚI)
+// ----------------------------
+export const userProxy = createProxyMiddleware({
+  target: services.user,            
+  changeOrigin: true,
+  selfHandleResponse: false,
+  proxyTimeout: 10000,
+  timeout: 10000,
+  pathRewrite: {
+    '^/api/user': ''                
+  },
+  logLevel: 'warn',
+  onProxyReq: (proxyReq, req, res) => {
+    forwardBody(proxyReq, req);
+  },
+  onError: (err, req, res) => {
+    console.error('[USER PROXY ERROR]', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({
+        message: 'Cannot reach user service',
+        error: err.message
+      });
+    }
+  }
+});
+
+// ----------------------------
+// UPLOADS PROXY (✅ THÊM MỚI)
+// ----------------------------
+export const uploadsProxy = createProxyMiddleware({
+  target: services.uploads,
+  changeOrigin: true,
+  selfHandleResponse: false,
+  proxyTimeout: 10000,
+  timeout: 10000,
+  pathRewrite: {
+    '^/uploads': '/uploads'
+  },
+  logLevel: 'warn',
+  onProxyRes: (proxyRes, req, res) => {
+    // ✅ Force CORS headers
+    proxyRes.headers['access-control-allow-origin'] = '*';
+    proxyRes.headers['access-control-allow-methods'] = 'GET, OPTIONS';
+    proxyRes.headers['access-control-allow-headers'] = 'Content-Type, Authorization';
+    proxyRes.headers['cross-origin-resource-policy'] = 'cross-origin';
+    delete proxyRes.headers['x-frame-options']; // Xóa header có thể block
+  },
+  onError: (err, req, res) => {
+    console.error('[UPLOADS PROXY ERROR]', err.message);
+    if (!res.headersSent) {
+      res.status(502).json({
+        message: 'Cannot reach uploads',
+        error: err.message
+      });
+    }
+  }
+});
+
+// ----------------------------
 // TEAM PROXY
 // ----------------------------
 export const teamProxy = createProxyMiddleware({

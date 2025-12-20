@@ -1,4 +1,3 @@
-// services/project-service/src/routes/project.routes.js
 import express from 'express';
 import { verifyToken } from '../middleware/auth.middleware.js';
 import {
@@ -8,26 +7,25 @@ import {
   updateProject,
   deleteProject,
   getMyProjects,
-  updateProjectStatus,
   recalcProjectProgress,
   batchGetProjects
 } from '../controllers/project.controller.js';
 
 const router = express.Router();
 
-// 📦 Batch endpoint - KHÔNG CẦN AUTH (cho internal service)
-router.get('/batch', batchGetProjects); // ← BỎ verifyToken
+// 📦 Batch endpoint - internal
+router.get('/batch', batchGetProjects);
 
 // 🧱 Tạo dự án mới
 router.post('/', verifyToken, createProject);
 
-// 📋 Lấy tất cả dự án của user (qua các team user tham gia)
+// 📋 Lấy tất cả dự án user tham gia
 router.get('/', verifyToken, getMyProjects);
 
-// 📂 Lấy danh sách dự án của một team cụ thể
+// 📂 Lấy dự án theo team
 router.get('/team/:teamId', verifyToken, getProjectsByTeam);
 
-// 🔍 Lấy chi tiết 1 dự án
+// 🔍 Chi tiết dự án
 router.get('/:id', verifyToken, getProjectById);
 
 // ✏️ Cập nhật dự án
@@ -36,10 +34,7 @@ router.put('/:id', verifyToken, updateProject);
 // 🗑️ Xóa dự án
 router.delete('/:id', verifyToken, deleteProject);
 
-// 🔄 Cập nhật trạng thái dự án
-router.patch('/:id/status', verifyToken, updateProjectStatus);
-
-// 🔄 Tính lại tiến độ dự án
+// 🔄 Tính lại tiến độ
 router.post('/:id/recalc-progress', verifyToken, recalcProjectProgress);
 
 export default router;

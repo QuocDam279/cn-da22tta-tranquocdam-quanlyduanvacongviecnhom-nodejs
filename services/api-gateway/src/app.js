@@ -10,6 +10,8 @@ import { requestLogger } from './middleware/requestLogger.js';
 import { verifyToken } from './middleware/verifyToken.js';
 import {
   authProxy,
+  userProxy,
+  uploadsProxy,
   projectProxy,
   teamProxy,
   taskProxy,
@@ -25,17 +27,32 @@ dotenv.config();
 const app = express();
 
 // -----------------------------
-// Middleware cơ bản
+// CORS - ĐẶT TRƯỚC TIÊN
 // -----------------------------
-app.use(helmet());
-
-// CORS cho Docker Compose dev
-// frontend gọi API Gateway bằng tên service 'frontend'
 app.use(cors({
   origin: ["http://localhost:5173", "http://frontend:5173"],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// -----------------------------
+// Uploads - ĐẶT TRƯỚC helmet
+// -----------------------------
+app.use('/uploads', uploadsProxy);        // Route gốc
+app.use('/api/uploads', uploadsProxy);    // ✅ THÊM: Route với /api prefix
+
+// -----------------------------
+// Helmet - Cấu hình để không block CORS
+// -----------------------------
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginEmbedderPolicy: false
+}));
+
+// -----------------------------
+// Các middleware khác
+// -----------------------------
 app.use(express.json({ limit: '10mb' }));
 app.use(morgan('dev'));
 app.use(requestLogger);
@@ -56,6 +73,9 @@ app.get('/_services', (req, res) => res.json({ services }));
 // 🔑 Auth (public)
 app.use('/api/auth', authProxy);
 
+// 👤 User Profile (cần token)
+app.use('/api/user', verifyToken, userProxy);
+
 // 👥 Team
 app.use('/api/teams', verifyToken, teamProxy);
 
@@ -74,7 +94,7 @@ app.use('/api/task-attachments', verifyToken, taskAttachmentProxy);
 // 🔔 Notification
 app.use('/api/notifications', verifyToken, notificationProxy);
 
-// Mail
+// 📧 Mail
 app.use('/api/mail', verifyToken, mailProxy);
 
 // 📊 Activity Logs

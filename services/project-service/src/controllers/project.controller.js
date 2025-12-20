@@ -105,7 +105,6 @@ export const updateProject = async (req, res) => {
     if (description) project.description = description;
     if (start_date) project.start_date = start_date;
     if (end_date) project.end_date = end_date;
-    if (status) project.status = status;
     if (progress !== undefined) project.progress = progress;
 
     project.updated_at = new Date();
@@ -181,42 +180,6 @@ export const getMyProjects = async (req, res) => {
 };
 
 /**
- * 🔄 Cập nhật trạng thái dự án (chỉ đổi status)
- */
-export const updateProjectStatus = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { status } = req.body;
-
-    const project = await Project.findById(id);
-    if (!project) return res.status(404).json({ message: 'Không tìm thấy dự án' });
-
-    if (project.created_by.toString() !== req.user.id)
-      return res.status(403).json({ message: 'Bạn không có quyền đổi trạng thái dự án này' });
-
-    const oldStatus = project.status;
-    project.status = status;
-    project.updated_at = new Date();
-    await project.save();
-
-    // 🧾 Ghi activity log
-    await ActivityLogger.logProjectStatusChanged(
-      req.user.id,
-      project._id,
-      project.project_name,
-      oldStatus,
-      status,
-      req.headers.authorization
-    );
-
-    res.json({ message: 'Cập nhật trạng thái thành công', project });
-  } catch (error) {
-    console.error('❌ Lỗi updateProjectStatus:', error.message);
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
-  }
-};
-
-/**
  * 🔢 Cập nhật tiến độ dự án
  */
 export const recalcProjectProgress = async (req, res) => {
@@ -286,7 +249,7 @@ export const batchGetProjects = async (req, res) => {
     }
     
     const projects = await Project.find({ _id: { $in: idArray } })
-      .select('project_name description status progress created_by created_at')
+      .select('project_name description progress created_by created_at')
       .lean();
     
     res.json({ success: true, data: projects });
