@@ -9,15 +9,15 @@ export const register = async (req, res) => {
     const existing = await User.findOne({ email });
     if (existing) return res.status(400).json({ message: 'Email đã tồn tại' });
 
-    const user = await User.create({ full_name, email, password });
+    const user = await User.create({ full_name, email, password, auth_provider: 'local' });
     const token = generateToken(user);
 
-    // Không trả password về client
     const userResponse = {
       _id: user._id,
       full_name: user.full_name,
       email: user.email,
       avatar: user.avatar,
+      auth_provider: user.auth_provider,
       created_at: user.created_at
     };
 
@@ -34,6 +34,10 @@ export const login = async (req, res) => {
     const user = await User.findOne({ email });
     if (!user) return res.status(404).json({ message: 'Không tìm thấy tài khoản' });
 
+    if (user.auth_provider === 'google') {
+      return res.status(400).json({ message: 'Tài khoản này đăng nhập bằng Google' });
+    }
+
     const isMatch = await user.comparePassword(password);
     if (!isMatch) return res.status(401).json({ message: 'Sai mật khẩu' });
 
@@ -42,12 +46,12 @@ export const login = async (req, res) => {
 
     const token = generateToken(user);
     
-    // Không trả password về client
     const userResponse = {
       _id: user._id,
       full_name: user.full_name,
       email: user.email,
       avatar: user.avatar,
+      auth_provider: user.auth_provider,
       created_at: user.created_at,
       last_login: user.last_login
     };
@@ -58,7 +62,32 @@ export const login = async (req, res) => {
   }
 };
 
-// 📌 Lấy thông tin nhiều user theo danh sách ID (dùng cho microservice khác)
+// Google OAuth Callback
+export const googleCallback = async (req, res) => {
+  try {
+    const user = req.user;
+    const token = generateToken(user);
+
+    const userResponse = {
+      _id: user._id,
+      full_name: user.full_name,
+      email: user.email,
+      avatar: user.avatar,
+      auth_provider: user.auth_provider,
+      created_at: user.created_at,
+      last_login: user.last_login
+    };
+
+    // Redirect về frontend với token và user info
+    const userData = encodeURIComponent(JSON.stringify(userResponse));
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}&user=${userData}`);
+  } catch (error) {
+    console.error('❌ Lỗi Google callback:', error);
+    res.redirect(`${process.env.FRONTEND_URL}/auth/error`);
+  }
+};
+
+// Lấy thông tin nhiều user theo danh sách ID
 export const getUsersInfo = async (req, res) => {
   try {
     const { ids } = req.body;
@@ -67,7 +96,6 @@ export const getUsersInfo = async (req, res) => {
       return res.status(400).json({ message: 'Danh sách ID không hợp lệ' });
     }
 
-    // Lấy danh sách user tương ứng
     const users = await User.find(
       { _id: { $in: ids } },
       '_id full_name email avatar created_at'
@@ -80,7 +108,7 @@ export const getUsersInfo = async (req, res) => {
   }
 };
 
-// 📌 Tìm user theo email (dùng cho các microservice)
+// Tìm user theo email
 export const findUserByEmail = async (req, res) => {
   try {
     const { email } = req.body;

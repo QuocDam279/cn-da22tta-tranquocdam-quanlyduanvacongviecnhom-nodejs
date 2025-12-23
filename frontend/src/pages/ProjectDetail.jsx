@@ -1,11 +1,10 @@
-// src/pages/ProjectDetail.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
+import { Users } from "lucide-react";
 import Header from "../components/common/Header";
 import ProjectInfo from "../components/project/ProjectInfo";
 import TaskList from "../components/task/TaskList";
 import CreateTaskButton from "../components/task/CreateTaskButton";
-import { Users } from "lucide-react";
 
 // Import hooks
 import { useProjectDetail } from "../hooks/useProjects";
@@ -13,10 +12,11 @@ import { useTasksByProject } from "../hooks/useTasks";
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  const [project, setProject] = useState(null);
 
   // ✅ Fetch project với React Query
   const {
-    data: project,
+    data: projectData,
     isLoading: loading,
     error: projectError,
     refetch: refetchProject,
@@ -29,15 +29,31 @@ export default function ProjectDetail() {
     refetch: refetchTasks,
   } = useTasksByProject(id);
 
+  // ✅ Cập nhật local state từ fetched data
+  useEffect(() => {
+    if (projectData) {
+      setProject(projectData);
+    }
+  }, [projectData]);
+
   // ✅ Refetch khi component mount hoặc id thay đổi
   useEffect(() => {
-    refetchProject();
-    refetchTasks();
+    if (id) {
+      refetchProject();
+      refetchTasks();
+    }
   }, [id, refetchProject, refetchTasks]);
 
-  // Handle task updated - React Query sẽ tự động refetch
-  const handleTaskUpdated = () => {
-    // Không cần làm gì - React Query mutations đã invalidate queries
+  // ✅ Handle project updated
+  const handleProjectUpdated = (updatedProject) => {
+    setProject(updatedProject);
+    refetchProject();
+  };
+
+  // ✅ Handle task updated/created
+  const handleTaskChange = () => {
+    refetchTasks();
+    refetchProject();
   };
 
   return (
@@ -79,45 +95,36 @@ export default function ProjectDetail() {
                   <span className="text-3xl">📋</span>
                 </div>
                 <p className="text-yellow-800 font-medium">Không tìm thấy dự án</p>
-                <p className="text-gray-500 text-sm">Dự án có thể đã bị xóa hoặc bạn không có quyền truy cập</p>
+                <p className="text-gray-500 text-sm">
+                  Dự án có thể đã bị xóa hoặc bạn không có quyền truy cập
+                </p>
               </div>
             </div>
           </div>
         ) : (
           <>
-            {/* ✨ IMPROVED BREADCRUMB - Đồng bộ với NameTeamProject */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-5 animate-fade-in">
-              <div className="flex items-center gap-3 flex-wrap">
-                {/* Back Arrow + Label */}
-                <div className="flex items-center gap-2 mr-2">
-                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-                  <span className="text-sm font-semibold text-gray-500">Quay lại:</span>
+            {/* ✨ BREADCRUMB - Nhỏ gọn như NameTeamProject */}
+            <div className="bg-white rounded-xl border border-gray-200 shadow-sm px-4 py-2.5 inline-flex items-center gap-2 animate-fade-in">
+              <Link
+                to={`/nhom/${project.team?._id}`}
+                className="group flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-all"
+              >
+                <div className="w-5 h-5 bg-blue-500 rounded flex items-center justify-center">
+                  <Users size={12} className="text-white" />
                 </div>
-
-                {/* Link tới nhóm */}
-                <Link
-                  to={`/nhom/${project.team?._id}`}
-                  className="group flex items-center gap-2 px-4 py-2 bg-gradient-to-br from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 border border-blue-200 rounded-xl transition-all hover:shadow-md"
-                >
-                  <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm">
-                    <Users size={16} className="text-white" />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-xs text-blue-600 font-semibold">Nhóm</span>
-                    <span className="text-sm font-bold text-gray-800 group-hover:text-blue-600 transition-colors">
-                      {project.team?.team_name || "Không xác định"}
-                    </span>
-                  </div>
-                </Link>
-              </div>
+                <span className="text-xs font-semibold text-gray-800 group-hover:text-blue-600 transition-colors">
+                  {project.team?.team_name || "N/A"}
+                </span>
+              </Link>
             </div>
 
             {/* Project Info Card */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-fade-in">
-              <ProjectInfo 
-                project={project} 
-                tasks={tasks} 
-                taskLoading={taskLoading} 
+              <ProjectInfo
+                project={project}
+                tasks={tasks}
+                taskLoading={taskLoading}
+                onProjectUpdated={handleProjectUpdated}
               />
             </div>
 
@@ -127,7 +134,9 @@ export default function ProjectDetail() {
               <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-50 to-white">
                 <div className="flex items-center gap-3">
                   <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-                  <h3 className="text-lg font-bold text-gray-800">Danh sách công việc</h3>
+                  <h3 className="text-lg font-bold text-gray-800">
+                    Danh sách công việc ({tasks.length})
+                  </h3>
                 </div>
               </div>
 
@@ -142,7 +151,10 @@ export default function ProjectDetail() {
                   </div>
                 ) : tasks.length > 0 ? (
                   <div className="max-h-[500px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
-                    <TaskList tasks={tasks} onTaskUpdated={handleTaskUpdated} />
+                    <TaskList
+                      tasks={tasks}
+                      onTaskUpdated={handleTaskChange}
+                    />
                   </div>
                 ) : (
                   <div className="flex justify-center items-center h-48">
@@ -164,8 +176,10 @@ export default function ProjectDetail() {
             <div className="animate-fade-in">
               <CreateTaskButton
                 projectId={id}
-                onCreated={handleTaskUpdated}
+                onCreated={handleTaskChange}
                 members={project.team_members || []}
+                projectStartDate={project.start_date?.slice(0, 10)}
+                projectEndDate={project.end_date?.slice(0, 10)}
               />
             </div>
           </>

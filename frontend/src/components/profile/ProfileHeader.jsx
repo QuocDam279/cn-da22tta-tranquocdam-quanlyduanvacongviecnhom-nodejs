@@ -1,18 +1,15 @@
-// ========================================
-// 1. ProfileHeader.jsx - IMPROVED
-// ========================================
 import React, { useRef } from "react";
 import { Camera, Loader2, User } from "lucide-react";
 import { useUploadAvatar } from "../../hooks/useProfile";
 import { toast } from "react-hot-toast";
+// 👇 Import component chung
+import UserAvatar from "../common/UserAvatar";
 
 export default function ProfileHeader({ user }) {
   const fileInputRef = useRef(null);
   const uploadAvatarMutation = useUploadAvatar();
 
-  const avatarUrl = user?.avatar
-    ? `${import.meta.env.VITE_API_URL}${user.avatar}`
-    : "https://ui-avatars.com/api/?name=" + encodeURIComponent(user?.full_name || "User");
+  // 🗑️ ĐÃ XÓA: Logic tính toán URL dài dòng ở đây
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -22,11 +19,13 @@ export default function ProfileHeader({ user }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Validate type
     if (!file.type.startsWith("image/")) {
       toast.error("Vui lòng chọn file ảnh");
       return;
     }
 
+    // Validate size (5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("Kích thước ảnh không được vượt quá 5MB");
       return;
@@ -45,15 +44,23 @@ export default function ProfileHeader({ user }) {
       <div className="flex flex-col sm:flex-row items-center gap-6">
         {/* Avatar với gradient border */}
         <div className="relative group">
+          {/* Hiệu ứng glow nền */}
           <div className="absolute -inset-1 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full blur opacity-75 group-hover:opacity-100 transition-opacity"></div>
+          
           <div className="relative">
-            <img
-              src={avatarUrl}
-              alt={user?.full_name}
-              className="w-28 h-28 rounded-full object-cover border-4 border-white shadow-xl relative z-10"
+            {/* ✅ SỬ DỤNG COMPONENT CHUNG */}
+            <UserAvatar 
+              user={user}
+              className="
+                w-28 h-28 
+                border-4 border-white 
+                shadow-xl 
+                relative z-10 
+                bg-gray-100
+              "
             />
 
-            {/* Overlay khi hover */}
+            {/* Nút upload đè lên (Overlay) */}
             <button
               onClick={handleAvatarClick}
               disabled={uploadAvatarMutation.isPending}
@@ -81,7 +88,7 @@ export default function ProfileHeader({ user }) {
 
         {/* User Info */}
         <div className="flex-1 text-center sm:text-left">
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
             {user?.full_name}
           </h1>
           <p className="text-gray-600 mb-3 text-lg">{user?.email}</p>
@@ -92,7 +99,7 @@ export default function ProfileHeader({ user }) {
             </span>
             <span className="text-gray-400">•</span>
             <span className="text-gray-600 font-medium">
-              Tham gia {new Date(user?.created_at).toLocaleDateString("vi-VN")}
+              Tham gia {user?.created_at ? new Date(user.created_at).toLocaleDateString("vi-VN") : "N/A"}
             </span>
           </div>
         </div>

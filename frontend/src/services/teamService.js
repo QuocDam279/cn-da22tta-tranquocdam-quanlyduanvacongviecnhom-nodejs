@@ -2,52 +2,71 @@
 
 const API_URL = `${import.meta.env.VITE_API_URL}/teams`;
 
-// Hàm lấy token từ localStorage
-function getToken() {
-  return localStorage.getItem("token");
-}
-
-// Hàm chuẩn gọi API có token
+// --- HELPER: API REQUEST CHUẨN (Đồng bộ với Task/Project Service) ---
 async function apiRequest(url, options = {}) {
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${getToken()}`,
-      ...(options.headers || {}),
-    },
-  });
+  const token = localStorage.getItem("token");
+  
+  try {
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+        ...(options.headers || {}),
+      },
+    });
 
-  const data = await res.json();
-  // Server trả về lỗi 400/500... thì res.ok là false
-  if (!res.ok) throw new Error(data.message || "Lỗi API Team Service");
-  return data;
+    // 1. Xử lý hết hạn token (401)
+    if (res.status === 401) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.href = "/login";
+      throw new Error("Phiên đăng nhập hết hạn");
+    }
+
+    // 2. Kiểm tra Content-Type
+    const contentType = res.headers.get("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+       if (!res.ok) throw new Error(`Lỗi Server (${res.status})`);
+       return null;
+    }
+
+    const data = await res.json();
+    
+    // 3. Xử lý lỗi logic
+    if (!res.ok) {
+      throw new Error(data.message || `Lỗi API: ${res.status}`);
+    }
+    
+    return data;
+  } catch (error) {
+    if (error.name === "TypeError" && error.message === "Failed to fetch") {
+      throw new Error("Không thể kết nối đến server.");
+    }
+    throw error;
+  }
 }
 
 // ========================
 // 🟦 TEAM API
 // ========================
 
-// Tạo team mới
 export function createTeam({ name, description }) {
-  // ĐÃ SỬA: Gửi team_name thay vì name để khớp với server
   return apiRequest(API_URL, {
     method: "POST",
     body: JSON.stringify({ team_name: name, description }),
   });
 }
 
-// Lấy tất cả team của user hiện tại
 export function getMyTeams() {
-  return apiRequest(API_URL, { method: "GET" });
+  return apiRequest(API_URL);
 }
 
-// Lấy chi tiết 1 team
 export function getTeamById(id) {
-  return apiRequest(`${API_URL}/${id}`, { method: "GET" });
+  return apiRequest(`${API_URL}/${id}`);
 }
 
-// Thêm thành viên vào team
+// Thêm thành viên (Batch)
 export function addMembers(teamId, userIds = []) {
   return apiRequest(`${API_URL}/${teamId}/members/batch`, {
     method: "POST",
@@ -55,41 +74,28 @@ export function addMembers(teamId, userIds = []) {
   });
 }
 
-
-// Xóa thành viên khỏi team
+// Xóa thành viên
 export function removeMember(teamId, userId) {
-  // Server dùng route /:id/members/:uid, client dùng /${teamId}/members/${userId}
-  // Giả định route server đúng là /teams/:id/members/:uid (hoặc /teams/:id/members/:userId)
   return apiRequest(`${API_URL}/${teamId}/members/${userId}`, {
     method: "DELETE",
   });
 }
 
-// Cập nhật thông tin team
 export function updateTeam(teamId, payload) {
-  // LƯU Ý: Nếu payload chứa tên nhóm, nó PHẢI là key team_name (ví dụ: { team_name: 'Tên mới', description: 'Mô tả mới' })
-  // Không cần sửa ở đây, nhưng phải đảm bảo người gọi hàm này sử dụng đúng key.
   return apiRequest(`${API_URL}/${teamId}`, {
     method: "PUT",
     body: JSON.stringify(payload),
   });
 }
 
-// Xóa team
 export function deleteTeam(teamId) {
-  return apiRequest(`${API_URL}/${teamId}`, {
-    method: "DELETE",
-  });
+  return apiRequest(`${API_URL}/${teamId}`, { method: "DELETE" });
 }
 
-// Rời team
 export function leaveTeam(teamId) {
-  return apiRequest(`${API_URL}/${teamId}/leave`, {
-    method: "POST",
-  });
+  return apiRequest(`${API_URL}/${teamId}/leave`, { method: "POST" });
 }
 
-// Lấy các team do user hiện tại tạo
 export function getLeaderTeams() {
-  return apiRequest(`${API_URL}/leader`, { method: "GET" });
+  return apiRequest(`${API_URL}/leader`);
 }

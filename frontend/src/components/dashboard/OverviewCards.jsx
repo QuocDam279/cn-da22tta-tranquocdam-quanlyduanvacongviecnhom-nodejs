@@ -1,4 +1,4 @@
-import { Users, FolderKanban, ListTodo, AlarmClock } from "lucide-react";
+import { Users, FolderKanban, ListTodo } from "lucide-react";
 
 export default function OverviewCards({
   teams = [],
@@ -6,61 +6,76 @@ export default function OverviewCards({
   tasks = [],
   loading = false,
 }) {
-  const teamCount = teams.length;
-  const projectCount = projects.length;
-  const taskCount = tasks.length;
-
-  // 🔥 Sắp đến hạn (3 ngày)
-  const now = new Date();
-  const limit = new Date();
-  limit.setDate(limit.getDate() + 3);
-
-  const upcomingCount = tasks.filter((t) => {
-    if (!t.due_date) return false;
-    const date = new Date(t.due_date);
-    return date >= now && date <= limit && t.status !== "Đã hoàn thành";
-  }).length;
-
   const cards = [
     {
       title: "Nhóm",
-      value: loading ? "…" : teamCount,
-      icon: <Users size={20} />,
-      color: "bg-blue-500",
+      value: loading ? "—" : teams.length,
+      icon: <Users size={18} />,
+      accent: "bg-blue-500",
+      iconBg: "bg-blue-50",
+      iconColor: "text-blue-600",
     },
     {
       title: "Dự án",
-      value: loading ? "…" : projectCount,
-      icon: <FolderKanban size={20} />,
-      color: "bg-green-500",
+      value: loading ? "—" : projects.length,
+      icon: <FolderKanban size={18} />,
+      accent: "bg-purple-500",
+      iconBg: "bg-purple-50",
+      iconColor: "text-purple-600",
     },
     {
       title: "Công việc",
-      value: loading ? "…" : taskCount,
-      icon: <ListTodo size={20} />,
-      color: "bg-orange-500",
-    },
-    {
-      title: "Sắp đến hạn",
-      value: loading ? "…" : upcomingCount,
-      icon: <AlarmClock size={20} />,
-      color: "bg-purple-500",
+      value: loading ? "—" : tasks.length,
+      icon: <ListTodo size={18} />,
+      accent: "bg-orange-500",
+      iconBg: "bg-orange-50",
+      iconColor: "text-orange-600",
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-      {cards.map((c) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {cards.map((c, index) => (
         <div
-          key={c.title}
-          className="bg-white p-4 rounded-xl shadow flex items-center gap-3 hover:shadow-md transition"
+          key={index}
+          className="
+            relative
+            bg-white
+            border border-gray-200
+            rounded-xl
+            px-4 py-3
+            transition
+            hover:shadow-sm
+          "
         >
-          <div className={`${c.color} text-white p-2 rounded-lg`}>
-            {c.icon}
-          </div>
-          <div>
-            <div className="text-lg font-bold text-slate-800">{c.value}</div>
-            <div className="text-sm text-slate-500">{c.title}</div>
+          {/* Accent bar */}
+          <div
+            className={`absolute left-0 top-0 h-full w-1 rounded-l-xl ${c.accent}`}
+          />
+
+          <div className="flex items-center justify-between pl-2">
+            {/* Left */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1 uppercase tracking-wide">
+                {c.title}
+              </p>
+              <p className="text-3xl font-semibold text-gray-900 leading-none">
+                {c.value}
+              </p>
+            </div>
+
+            {/* Icon */}
+            <div
+              className={`
+                w-10 h-10
+                flex items-center justify-center
+                rounded-lg
+                ${c.iconBg}
+                ${c.iconColor}
+              `}
+            >
+              {c.icon}
+            </div>
           </div>
         </div>
       ))}

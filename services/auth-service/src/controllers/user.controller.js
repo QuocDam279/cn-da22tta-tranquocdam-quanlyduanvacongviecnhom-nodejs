@@ -52,23 +52,34 @@ export const uploadAvatar = async (req, res) => {
       return res.status(400).json({ message: 'Vui lòng chọn file ảnh' });
     }
 
-    // Lấy thông tin user hiện tại để xóa avatar cũ (nếu có)
     const user = await User.findById(req.user.id);
     if (!user) {
-      // Xóa file vừa upload nếu không tìm thấy user
-      fs.unlinkSync(req.file.path);
+      // Nếu không tìm thấy user, xóa ngay ảnh vừa up lên để tránh rác
+      if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
       return res.status(404).json({ message: 'Không tìm thấy người dùng' });
     }
 
-    // Xóa avatar cũ nếu có (và không phải avatar mặc định)
-    if (user.avatar && user.avatar !== '') {
-      const oldAvatarPath = path.join(process.cwd(), 'uploads', path.basename(user.avatar));
+    // --- LOGIC XÓA ẢNH CŨ AN TOÀN ---
+    // Chỉ xóa nếu ảnh cũ tồn tại VÀ KHÔNG PHẢI là link online (Google/Facebook)
+    if (user.avatar && !user.avatar.startsWith('http') && !user.avatar.startsWith('https')) {
+      
+      // user.avatar đang lưu dạng: "/uploads/filename.jpg" -> Cần lấy tên file
+      const oldFileName = path.basename(user.avatar);
+      const oldAvatarPath = path.join(process.cwd(), 'uploads', oldFileName);
+
+      // Kiểm tra file có trên ổ cứng không rồi mới xóa
       if (fs.existsSync(oldAvatarPath)) {
-        fs.unlinkSync(oldAvatarPath);
+        try {
+          fs.unlinkSync(oldAvatarPath);
+          console.log(`Đã xóa avatar cũ: ${oldFileName}`);
+        } catch (err) {
+          console.error("Lỗi khi xóa ảnh cũ:", err);
+        }
       }
     }
+    // --------------------------------
 
-    // Cập nhật đường dẫn avatar mới
+    // Lưu đường dẫn mới (đường dẫn tương đối để frontend truy cập)
     const avatarUrl = `/uploads/${req.file.filename}`;
     user.avatar = avatarUrl;
     await user.save();
@@ -77,9 +88,10 @@ export const uploadAvatar = async (req, res) => {
       message: 'Cập nhật avatar thành công', 
       avatar: avatarUrl 
     });
+
   } catch (error) {
-    // Xóa file nếu có lỗi xảy ra
-    if (req.file) {
+    // Dọn dẹp file rác nếu có lỗi
+    if (req.file && fs.existsSync(req.file.path)) {
       fs.unlinkSync(req.file.path);
     }
     console.error('❌ Lỗi uploadAvatar:', error.message);

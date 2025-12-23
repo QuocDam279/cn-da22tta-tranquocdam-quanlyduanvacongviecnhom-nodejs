@@ -8,4 +8,6 @@ const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`🚀 Auth Service đang chạy trên port ${PORT}`);
+  console.log(`📍 Google OAuth Callback: http://localhost:${PORT}/api/auth/google/callback`);
+  console.log(`🔗 Google Login URL: http://localhost:${PORT}/api/auth/google`);
 });

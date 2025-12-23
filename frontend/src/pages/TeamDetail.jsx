@@ -1,4 +1,3 @@
-// src/components/team/TeamDetail.jsx
 import React, { useState, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "../components/common/Header";
@@ -15,7 +14,7 @@ import { useProjectsByTeam } from "../hooks/useProjects";
 export default function TeamDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("members");
+  const [activeTab, setActiveTab] = useState("projects"); // ✅ Thay từ "members" → "projects"
   
   const userId = localStorage.getItem("userId");
 
@@ -48,8 +47,8 @@ export default function TeamDetail() {
   }, [teamData, currentUserRole]);
 
   const TABS = [
-    { key: "members", label: "Thành viên" },
     { key: "projects", label: "Dự án" },
+    { key: "members", label: "Thành viên" },
   ];
 
   return (
@@ -136,20 +135,6 @@ export default function TeamDetail() {
 
               {/* Tab Content */}
               <div className="p-6 lg:p-8">
-                {activeTab === "members" && (
-                  <div className="animate-fade-in">
-                    <TeamMembers
-                      teamId={team.team._id}
-                      members={team.members}
-                      currentUserId={userId}
-                      currentUserRole={team.currentUserRole}
-                      onMembersUpdated={() => {
-                        // React Query sẽ tự động refetch
-                      }}
-                    />
-                  </div>
-                )}
-
                 {activeTab === "projects" && (
                   <div className="space-y-6 animate-fade-in">
                     {team.currentUserRole === "leader" && (
@@ -186,6 +171,20 @@ export default function TeamDetail() {
                         error=""
                       />
                     )}
+                  </div>
+                )}
+
+                {activeTab === "members" && (
+                  <div className="animate-fade-in">
+                    <TeamMembers
+                      teamId={team.team._id}
+                      members={team.members}
+                      currentUserId={userId}
+                      currentUserRole={team.currentUserRole}
+                      onMembersUpdated={() => {
+                        // React Query sẽ tự động refetch
+                      }}
+                    />
                   </div>
                 )}
               </div>

@@ -1,21 +1,22 @@
-// src/components/team/AddTeamForm.jsx
 import React, { useState } from "react";
-import { ArrowLeft, User, Plus, X } from "lucide-react";
-import { createTeam, addMembers } from "../../services/teamService";
+import { ArrowLeft, User, Plus, X, CheckCircle2 } from "lucide-react";
+import toast from "react-hot-toast";
 import { findUserByEmail } from "../../services/authService";
+import { useCreateTeam, useAddMembers } from "../../hooks/useTeams";
 
 export default function AddTeamForm({ onClose, onCreated }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [emailInput, setEmailInput] = useState("");
-  const [members, setMembers] = useState([]); // { _id, email, full_name }
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");       // Lỗi tổng thể
-  const [memberError, setMemberError] = useState(""); // Lỗi thêm thành viên
+  const [members, setMembers] = useState([]);
+  const [error, setError] = useState("");
+  const [memberError, setMemberError] = useState("");
 
-  // ----------------------
-  // Thêm thành viên theo email
-  // ----------------------
+  const createTeamMutation = useCreateTeam();
+  const addMembersMutation = useAddMembers();
+
+  const loading = createTeamMutation.isPending || addMembersMutation.isPending;
+
   const handleAddMember = async () => {
     if (!emailInput.trim()) return;
 
@@ -28,8 +29,7 @@ export default function AddTeamForm({ onClose, onCreated }) {
         return;
       }
 
-      // Ngăn thêm chính mình
-      const currentUserId = localStorage.getItem("user_id"); // hoặc lấy từ context/auth
+      const currentUserId = localStorage.getItem("user_id");
       if (user._id === currentUserId) {
         setMemberError("Bạn không thể thêm chính mình");
         return;
@@ -43,56 +43,89 @@ export default function AddTeamForm({ onClose, onCreated }) {
       setMembers((prev) => [...prev, user]);
       setEmailInput("");
       setMemberError("");
+      
+      toast.success(`Thêm ${user.full_name} thành công`, {
+        icon: "✅",
+        duration: 2000,
+      });
     } catch (err) {
       setMemberError(err.message || "Không tìm thấy người dùng này");
+      toast.error(err.message || "Không thể thêm thành viên", {
+        duration: 2000,
+      });
     }
   };
 
-  // ----------------------
-  // Xóa 1 thành viên
-  // ----------------------
   const removeMember = (uid) => {
+    const member = members.find((m) => m._id === uid);
     setMembers((prev) => prev.filter((m) => m._id !== uid));
+    toast.success(`Đã xóa ${member?.full_name}`, {
+      icon: "🗑️",
+      duration: 1500,
+    });
   };
 
-  // ----------------------
-  // Tạo nhóm + thêm members
-  // ----------------------
   const handleSubmit = async () => {
     if (!name.trim()) {
       setError("Tên nhóm là bắt buộc");
+      toast.error("Vui lòng nhập tên nhóm", {
+        duration: 2000,
+      });
       return;
     }
 
-    setLoading(true);
     setError("");
     setMemberError("");
 
+    const loadingToast = toast.loading("Đang tạo nhóm...");
+
     try {
       // 1️⃣ Tạo team
-      const data = await createTeam({ name, description });
-      const teamId = data.team._id;
+      const response = await createTeamMutation.mutateAsync({
+        name,
+        description,
+      });
 
-      // 2️⃣ Thêm tất cả member (nếu có)
+      const teamId = response.team._id;
+
+      // 2️⃣ Thêm members (nếu có)
       if (members.length > 0) {
         try {
-          await addMembers(teamId, members.map((m) => m._id));
+          await addMembersMutation.mutateAsync({
+            teamId,
+            userIds: members.map((m) => m._id),
+          });
+          toast.success(`Đã thêm ${members.length} thành viên`, {
+            duration: 2000,
+          });
         } catch (memberErr) {
           setMemberError(
             memberErr.message || "Có lỗi khi thêm thành viên vào nhóm"
           );
+          toast.error("Lỗi thêm thành viên", {
+            duration: 2000,
+          });
         }
       }
 
-      // 3️⃣ Gọi callback parent
-      if (onCreated) onCreated(data.team);
+      // 3️⃣ Thông báo thành công chính
+      toast.success(`Tạo nhóm "${name}" thành công`, {
+        duration: 3000,
+        icon: "🚀",
+      });
 
-      // 4️⃣ Đóng form
-      onClose();
+      // 4️⃣ Callback
+      if (onCreated) onCreated(response.team);
+
+      // 5️⃣ Đóng form
+      setTimeout(() => onClose(), 500);
     } catch (err) {
       setError(err.message || "Tạo nhóm thất bại");
+      toast.error(err.message || "Tạo nhóm thất bại", {
+        duration: 2000,
+      });
     } finally {
-      setLoading(false);
+      toast.dismiss(loadingToast);
     }
   };
 
@@ -111,10 +144,8 @@ export default function AddTeamForm({ onClose, onCreated }) {
           Các trường bắt buộc được đánh dấu bằng dấu *
         </p>
 
-        {/* Lỗi tổng */}
         {error && <p className="text-red-500 text-sm mb-2">{error}</p>}
 
-        {/* Name */}
         <label className="font-medium">Tên nhóm *</label>
         <input
           type="text"
@@ -124,7 +155,6 @@ export default function AddTeamForm({ onClose, onCreated }) {
           className="w-full border rounded-lg px-3 py-2 mt-1 mb-4 outline-none"
         />
 
-        {/* Description */}
         <label className="font-medium">Mô tả</label>
         <textarea
           value={description}
@@ -134,7 +164,6 @@ export default function AddTeamForm({ onClose, onCreated }) {
           rows={3}
         />
 
-        {/* Add member input */}
         <label className="font-medium">Thêm thành viên</label>
         <div className="flex items-center gap-2 border rounded-lg px-3 py-2 mt-1 mb-2">
           <User size={18} className="text-gray-600" />
@@ -153,21 +182,23 @@ export default function AddTeamForm({ onClose, onCreated }) {
         </div>
         {memberError && <p className="text-red-500 text-sm mb-2">{memberError}</p>}
 
-        {/* Member list */}
         {members.length > 0 && (
           <div className="mb-4">
-            <p className="font-medium mb-2">Danh sách thành viên:</p>
+            <p className="font-medium mb-2">Danh sách thành viên ({members.length}):</p>
             {members.map((m) => (
               <div
                 key={m._id}
-                className="flex items-center justify-between border px-3 py-2 rounded-lg mb-2"
+                className="flex items-center justify-between border px-3 py-2 rounded-lg mb-2 bg-blue-50"
               >
                 <div>
-                  <p className="font-medium">{m.full_name}</p>
-                  <p className="text-sm text-gray-600">{m.email}</p>
+                  <p className="font-medium text-sm">{m.full_name}</p>
+                  <p className="text-xs text-gray-600">{m.email}</p>
                 </div>
-                <button onClick={() => removeMember(m._id)}>
-                  <X size={18} className="text-red-500" />
+                <button 
+                  onClick={() => removeMember(m._id)}
+                  className="text-red-500 hover:bg-red-100 p-1 rounded"
+                >
+                  <X size={16} />
                 </button>
               </div>
             ))}
@@ -175,24 +206,32 @@ export default function AddTeamForm({ onClose, onCreated }) {
         )}
 
         {/* Buttons */}
-        <div className="flex justify-end">
-          <div className="grid grid-cols-2 gap-3 w-3/5">
-            <button
-              onClick={onClose}
-              className="w-full px-4 py-2 rounded-lg border hover:bg-gray-100"
-              disabled={loading}
-            >
-              Hủy
-            </button>
+        <div className="flex justify-end gap-3 mt-8">
+          <button
+            onClick={onClose}
+            className="px-6 py-2 rounded-lg border hover:bg-gray-100 font-medium"
+            disabled={loading}
+          >
+            Hủy
+          </button>
 
-            <button
-              onClick={handleSubmit}
-              className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-              disabled={loading}
-            >
-              {loading ? "Đang tạo..." : "Tạo mới"}
-            </button>
-          </div>
+          <button
+            onClick={handleSubmit}
+            className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-400 font-medium flex items-center gap-2"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <span className="animate-spin">⏳</span>
+                Đang tạo...
+              </>
+            ) : (
+              <>
+                <CheckCircle2 size={18} />
+                Tạo mới
+              </>
+            )}
+          </button>
         </div>
       </div>
     </div>

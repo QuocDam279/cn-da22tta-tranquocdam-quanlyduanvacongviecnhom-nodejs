@@ -1,17 +1,21 @@
 import React from "react";
 import Header from "../components/common/Header";
+import Footer from "../components/common/Footer";
 import DashboardTeam from "../components/team/DashboardTeam";
 
 export default function Team() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      {/* Header */}
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+      {/* HEADER */}
       <Header />
 
-      {/* Content */}
-      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+      {/* MAIN CONTENT */}
+      <main className="flex-1 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <DashboardTeam />
       </main>
+
+      {/* FOOTER */}
+      <Footer />
     </div>
   );
 }

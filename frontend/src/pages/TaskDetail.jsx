@@ -1,131 +1,191 @@
-// ========================================
-// 2. TaskDetail.jsx - IMPROVED (No Menu)
-// ========================================
 import React, { useState, useEffect } from "react";
-import { useParams, useNavigate, Link } from "react-router-dom";
-import { ArrowLeft, Briefcase } from "lucide-react";
+import { useParams, useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { MessageSquare, Layout, Clock, ChevronRight } from "lucide-react";
 
+// Components
 import Header from "../components/common/Header";
 import TaskHeader from "../components/task/TaskHeader";
 import TaskSidebar from "../components/task/TaskSidebar";
 import NameTeamProject from "../components/task/NameTeamProject";
+import TaskComments from "../components/task/TaskComments";
 
+// Hooks
 import { useTaskDetail } from "../hooks/useTasks";
+import { useProjectDetail } from "../hooks/useProjects";
 
 export default function TaskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
 
   const [currentUser, setCurrentUser] = useState(null);
+  const [task, setTask] = useState(null);
+
+  // Load User
   useEffect(() => {
     const userData = localStorage.getItem("user");
-    if (userData) {
-      setCurrentUser(JSON.parse(userData));
-    }
+    if (userData) setCurrentUser(JSON.parse(userData));
   }, []);
 
+  // API Calls
   const {
-    data: task,
-    isLoading,
-    isError,
-    error,
+    data: taskData,
+    isLoading: taskLoading,
+    isError: taskError,
+    error: taskErrorData,
+    refetch: refetchTask,
   } = useTaskDetail(id);
 
-  const handleDeleted = () => {
+  const projectId = taskData?.project_id || task?.project_id;
+  const { data: projectData, isLoading: projectLoading } = useProjectDetail(projectId);
+
+  // Sync State
+  useEffect(() => {
+    if (taskData) setTask(taskData);
+  }, [taskData]);
+
+  // Handlers
+  const handleTaskUpdated = (updatedTask) => {
+    setTask(updatedTask);
+    refetchTask();
+    toast.success("Đã cập nhật công việc");
+  };
+
+  const handleTaskDeleted = () => {
+    toast.success("Đã xóa công việc");
     navigate("/congviec");
   };
 
+  const isLoading = taskLoading || (projectId && projectLoading);
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
-      {/* Header */}
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/20 to-purple-50/20">
       <Header />
 
-      {/* Main Content */}
-      <main className="pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-6">
-        {/* Loading State */}
+      <main className="pt-20 pb-12 px-4 max-w-[1600px] mx-auto">
         {isLoading ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12">
-            <div className="flex justify-center items-center">
-              <div className="text-center space-y-3">
-                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-                <p className="text-gray-500 font-medium">Đang tải chi tiết công việc...</p>
-              </div>
-            </div>
-          </div>
-        ) : isError ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12">
-            <div className="flex justify-center items-center">
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-3xl">⚠️</span>
-                </div>
-                <p className="text-red-600 font-medium">
-                  {error?.message || "Lỗi khi tải công việc"}
-                </p>
-                <p className="text-gray-500 text-sm">Vui lòng thử lại sau</p>
-              </div>
-            </div>
-          </div>
+          <LoadingView />
+        ) : taskError ? (
+          <ErrorView message={taskErrorData?.message} onRetry={refetchTask} />
         ) : !task ? (
-          <div className="bg-white rounded-2xl border border-gray-200 shadow-lg p-12">
-            <div className="flex justify-center items-center">
-              <div className="text-center space-y-3">
-                <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto">
-                  <span className="text-3xl">📋</span>
-                </div>
-                <p className="text-yellow-800 font-medium">Không tìm thấy công việc</p>
-                <p className="text-gray-500 text-sm">Công việc có thể đã bị xóa</p>
+          <NotFoundView />
+        ) : (
+          <div className="space-y-4 animate-fade-in">
+            
+            {/* Breadcrumb Navigation */}
+            <div className="flex items-center justify-between">
+               <NameTeamProject task={task} />
+              <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-xl border border-gray-400 shadow-sm">
+                <Clock size={14} className="text-blue-500" />
+                <span className="text-xs text-gray-500">
+                  Cập nhật lần cuối vào
+                </span>
+                <span className="text-xs font-semibold text-gray-800">
+                  {new Date(task.updated_at).toLocaleString("vi-VN", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    second: "2-digit",
+                    day: "2-digit",
+                    month: "2-digit",
+                    year: "numeric",
+                  })}
+                </span>
               </div>
+            </div>
+
+            {/* Main Layout: 2 cột (3 phần trái + 2 phần phải) */}
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+              
+              {/* CỘT TRÁI: 3 phần (Task Info + Comments) */}
+              <div className="lg:col-span-3 space-y-4">
+                
+                {/* Task Header */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                   <TaskHeader
+                      task={task}
+                      onUpdated={handleTaskUpdated}
+                      onDeleted={handleTaskDeleted}
+                      currentUserId={currentUser?._id}
+                    />
+                </div>
+
+                {/* Task Comments */}
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden flex flex-col" style={{maxHeight: 'calc(100vh - 20rem)', minHeight: '400px'}}>
+                  <div className="p-3 border-b border-gray-100 flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 text-white">
+                    <MessageSquare size={16} />
+                    <span className="font-semibold text-sm">Thảo luận</span>
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <TaskComments 
+                        task={task} 
+                        currentUser={currentUser} 
+                    />
+                  </div>
+                </div>
+
+              </div>
+
+              {/* CỘT PHẢI: 2 phần (Sidebar) */}
+              <div className="lg:col-span-2 lg:sticky lg:top-20 h-fit">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-md overflow-hidden">
+                    <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-3 text-white flex items-center gap-2">
+                        <Layout size={16} />
+                        <span className="font-semibold text-sm">Chi tiết</span>
+                    </div>
+                    <TaskSidebar
+                      task={task}
+                      onUpdated={handleTaskUpdated}
+                      currentUser={currentUser}
+                      members={projectData?.team_members || []} 
+                      project={projectData}
+                    />
+                </div>
+              </div>
+
+            </div>
+
+            {/* Footer metadata */}
+            <div className="text-center text-xs text-gray-400 pt-4">
+                Task ID: {task._id}
             </div>
           </div>
-        ) : (
-          <>
-            {/* Team & Project Info */}
-            <div className="animate-fade-in">
-              <NameTeamProject task={task} />
-            </div>
-
-            {/* Main Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* LEFT: Main Content (2/3) */}
-              <div className="lg:col-span-2 space-y-6 animate-fade-in">
-                <TaskHeader
-                  task={task}
-                  onUpdated={() => {}}
-                  onDeleted={handleDeleted}
-                  currentUserId={currentUser?._id}
-                />
-              </div>
-
-              {/* RIGHT: Sidebar (1/3) */}
-              <div className="lg:col-span-1 animate-fade-in">
-                <TaskSidebar
-                  task={task}
-                  onUpdated={() => {}}
-                  currentUser={currentUser}
-                />
-              </div>
-            </div>
-          </>
         )}
       </main>
 
-      {/* Custom Animations */}
       <style jsx>{`
         @keyframes fade-in {
-          from {
-            opacity: 0;
-            transform: translateY(10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
+          from { opacity: 0; transform: translateY(10px); }
+          to { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-in {
-          animation: fade-in 0.5s ease-out;
+          animation: fade-in 0.4s ease-out forwards;
         }
       `}</style>
     </div>
   );
 }
+
+// --- SUB COMPONENTS ---
+const LoadingView = () => (
+  <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
+    <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+    <p className="text-gray-500 font-medium">Đang tải dữ liệu...</p>
+  </div>
+);
+
+const ErrorView = ({ message, onRetry }) => (
+  <div className="flex flex-col items-center justify-center h-[70vh] gap-4">
+    <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center">
+        <span className="text-4xl">⚠️</span>
+    </div>
+    <h3 className="text-xl font-bold text-gray-800">Đã xảy ra lỗi</h3>
+    <p className="text-red-600">{message || "Không thể tải thông tin"}</p>
+    <button onClick={onRetry} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Thử lại</button>
+  </div>
+);
+
+const NotFoundView = () => (
+  <div className="text-center py-20">
+    <p className="text-gray-500 text-lg">Không tìm thấy công việc này.</p>
+  </div>
+);

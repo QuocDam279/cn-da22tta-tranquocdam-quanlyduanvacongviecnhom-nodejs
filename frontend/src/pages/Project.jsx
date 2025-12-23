@@ -1,6 +1,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import ProjectList from "../components/project/ProjectList";
+import CreateProjectButton from "../components/project/CreateProjectButton";
 import { useMyProjects } from "../hooks/useProjects";
 
 export default function Project() {
@@ -13,33 +14,27 @@ export default function Project() {
     error,
   } = useMyProjects();
 
+  const handleProjectCreated = (newProject) => {
+    // Có thể thêm logic khác nếu cần
+    console.log("Project created:", newProject);
+  };
+
   return (
-    <div className="bg-white min-h-screen">
-      <div className="max-w-7xl mx-auto pt-10 px-6 space-y-6">
-        {/* Content */}
-        {isLoading && (
-          <p className="text-gray-500">Đang tải dự án...</p>
-        )}
-
-        {isError && (
-          <p className="text-red-500">
-            {error?.message || "Có lỗi xảy ra"}
+    <div className="bg-gradient-to-br from-gray-50 to-white min-h-screen">
+      <div className="max-w-7xl mx-auto pt-10 px-6 space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <p className="text-gray-600">
+            Quản lý và theo dõi tiến độ tất cả dự án của bạn
           </p>
-        )}
+        </div>
 
-        {!isLoading && !isError && projects.length > 0 && (
-          <ProjectList
-            projects={projects}
-            loading={isLoading}
-            error={error}
-          />
-        )}
-
-        {!isLoading && !isError && projects.length === 0 && (
-          <div className="text-gray-500 italic">
-            Chưa có dự án nào.
-          </div>
-        )}
+        {/* Content */}
+        <ProjectList
+          projects={projects}
+          loading={isLoading}
+          error={error?.message}
+        />
       </div>
     </div>
   );

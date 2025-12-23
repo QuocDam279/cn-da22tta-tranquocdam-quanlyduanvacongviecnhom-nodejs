@@ -267,7 +267,7 @@ export default function Calendar({ tasks = [] }) {
           </>
         ) : (
           <div className="text-center text-gray-500 py-8">
-            Chọn một ngày để các công việc
+            Chọn một ngày để xem các công việc
           </div>
         )}
       </div>

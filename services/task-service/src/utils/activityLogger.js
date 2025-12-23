@@ -80,6 +80,21 @@ class ActivityLogger {
     const action = `Cập nhật tiến độ: ${taskName} (${progress}%)`;
     await this.log({ user_id, action, related_id: task_id, token });
   }
+  // 👉 Ghi log hoạt động chung
+  static async logActivity({ user_id, action, related_type, related_id, related_data }) {
+      try {
+          // Gọi sang Activity Service
+          await http.activity.post('/', {
+              user_id,
+              action,
+              related_type,
+              related_id,
+              related_data
+          });
+      } catch (err) {
+          console.error("Activity Log Error:", err.message);
+      }
+  }
 }
 
 export default ActivityLogger;

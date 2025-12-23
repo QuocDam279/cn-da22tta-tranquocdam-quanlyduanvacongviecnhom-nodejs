@@ -1,383 +1,181 @@
-// src/components/task/TaskSidebar.jsx
-import React, { useState } from "react";
-import { Calendar, Lock, User, UserCheck, AlertCircle, Activity } from "lucide-react";
+import React from "react";
+import { Lock } from "lucide-react";
+import toast from "react-hot-toast";
 import TaskProgressBar from "./TaskProgressBar";
-import { useUpdateTask } from "../../hooks/useTasks";
+import TaskDates from "./TaskDates";
+import TaskPeople from "./TaskPeople";
+import StatusSelect from "./StatusSelect";
+import PrioritySelect from "./PrioritySelect";
+import {
+  useUpdateTaskStatus,
+  useUpdateTaskProgress,
+  useUpdateTaskPriority,
+  useUpdateTaskDueDate,
+  useUpdateTaskAssignee,
+  useUpdateTaskStartDate,
+} from "../../hooks/useTasks";
 
-export default function TaskSidebar({ task, onUpdated, currentUser }) {
-  const [editingDate, setEditingDate] = useState(null);
-  const [error, setError] = useState(null);
+const areIdsEqual = (id1, id2) => {
+  if (!id1 || !id2) return false;
+  const str1 = typeof id1 === "object" ? id1.toString() : id1;
+  const str2 = typeof id2 === "object" ? id2.toString() : id2;
+  return str1 === str2;
+};
 
-  const updateTaskMutation = useUpdateTask();
+export default function TaskSidebar({
+  task,
+  onUpdated,
+  currentUser,
+  members = [],
+  project,
+}) {
+  const updateStatusMutation = useUpdateTaskStatus();
+  const updateProgressMutation = useUpdateTaskProgress();
+  const updatePriorityMutation = useUpdateTaskPriority();
+  const updateDueDateMutation = useUpdateTaskDueDate();
+  const updateStartDateMutation = useUpdateTaskStartDate();
+  const updateAssigneeMutation = useUpdateTaskAssignee();
 
-  const getAvatarUrl = (user) => {
-    if (!user) return null;
-    
-    if (user.avatar) {
-      return `${import.meta.env.VITE_API_URL}${user.avatar}`;
-    }
-    
-    const name = user.full_name || user.email || "User";
-    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`;
-  };
+  const currentMemberInfo = members.find(m => 
+    areIdsEqual(m.user?._id || m.user, currentUser?._id)
+  );
 
-  const canEdit = () => {
-    if (!currentUser) return false;
-    if (currentUser.role === "Leader") return true;
-    if (task.assigned_to?._id === currentUser._id || task.assigned_to === currentUser._id) {
-      return true;
-    }
-    return false;
-  };
+  const isTeamLeader = currentMemberInfo?.role?.toLowerCase() === "leader";
+  const isProjectCreator = areIdsEqual(project?.created_by?._id || project?.created_by, currentUser?._id);
+  const canChangeAssignee = isTeamLeader || isProjectCreator;
 
-  const hasEditPermission = canEdit();
+  const canEditGeneral =
+    canChangeAssignee || 
+    areIdsEqual(task.assigned_to?._id || task.assigned_to, currentUser?._id) ||
+    areIdsEqual(task.created_by?._id || task.created_by, currentUser?._id);
 
-  const statusMap = {
-    "Chưa thực hiện": "To Do",
-    "Đang thực hiện": "In Progress",
-    "Đã hoàn thành": "Done",
-  };
+  const isUpdating =
+    updateStatusMutation.isPending ||
+    updateProgressMutation.isPending ||
+    updatePriorityMutation.isPending ||
+    updateDueDateMutation.isPending ||
+    updateStartDateMutation.isPending ||
+    updateAssigneeMutation.isPending;
 
-  const priorityMap = {
-    Thấp: "Low",
-    "Trung bình": "Medium",
-    Cao: "High",
-  };
-
-  const updateField = async (field, value) => {
-    if (!hasEditPermission) {
-      setError("Bạn không có quyền chỉnh sửa task này!");
-      setTimeout(() => setError(null), 3000);
-      return;
-    }
-
-    const updatedData = {};
-
-    if (field === "status") {
-      updatedData.status = statusMap[value];
-      if (value === "Đã hoàn thành") updatedData.progress = 100;
-      else if (value === "Chưa thực hiện") updatedData.progress = 0;
-      else if (task.progress === 100) updatedData.progress = 99;
-    } else if (field === "progress") {
-      const num = Number(value);
-      updatedData.progress = num;
-      if (num === 100) updatedData.status = "Done";
-      else if (num === 0) updatedData.status = "To Do";
-      else if (task.status === "Done" || task.status === "To Do") updatedData.status = "In Progress";
-    } else if (field === "priority") {
-      updatedData.priority = priorityMap[value];
-    } else if (field === "start_date" || field === "due_date") {
-      updatedData[field] = value;
-    }
-
+  const handleUpdate = async (mutation, payload, successMsg) => {
     try {
-      const res = await updateTaskMutation.mutateAsync({ taskId: task._id, payload: updatedData });
+      const res = await mutation.mutateAsync(payload);
       onUpdated(res.task);
-      setEditingDate(null);
-      setError(null);
     } catch (err) {
-      console.error("Lỗi cập nhật task:", err);
-      setError(err.message || "Không thể cập nhật task. Vui lòng thử lại!");
-      setTimeout(() => setError(null), 3000);
+      console.error(err);
+      toast.error(err.message || "Cập nhật thất bại");
     }
   };
 
-  const statusValue = Object.keys(statusMap).find((k) => statusMap[k] === task.status) || "Chưa thực hiện";
-  const priorityValue = Object.keys(priorityMap).find((k) => priorityMap[k] === task.priority) || "Trung bình";
-
-  const formatDateForInput = (dateStr) => {
-    if (!dateStr) return "";
-    const date = new Date(dateStr);
-    return date.toISOString().split("T")[0];
+  const updateStatus = (val) => {
+    const statusMap = { "Chưa thực hiện": "To Do", "Đang thực hiện": "In Progress", "Đã hoàn thành": "Done" };
+    const newStatus = statusMap[val];
+    let newProgress = task.progress;
+    if (val === "Đã hoàn thành") newProgress = 100;
+    else if (val === "Chưa thực hiện") newProgress = 0;
+    handleUpdate(updateStatusMutation, { taskId: task._id, status: newStatus, progress: newProgress }, "Đã cập nhật trạng thái");
   };
 
-  const formatDateTime = (dateStr) => {
-    if (!dateStr) return "-";
-    return new Date(dateStr).toLocaleDateString("vi-VN");
+  const updateProgress = (val) => {
+    const num = Number(val);
+    let newStatus = task.status;
+    if (num === 100) newStatus = "Done";
+    else if (num === 0) newStatus = "To Do";
+    else newStatus = "In Progress";
+    handleUpdate(updateProgressMutation, { taskId: task._id, progress: num, status: newStatus }, "Đã cập nhật tiến độ");
   };
 
-  // Priority colors
-  const getPriorityColor = (priority) => {
-    switch (priority) {
-      case "Thấp": return "text-emerald-600 bg-emerald-50 border-emerald-200";
-      case "Trung bình": return "text-amber-600 bg-amber-50 border-amber-200";
-      case "Cao": return "text-rose-600 bg-rose-50 border-rose-200";
-      default: return "text-gray-600 bg-gray-50 border-gray-200";
+  const updatePriority = (val) => {
+    const priorityMap = { Thấp: "Low", "Trung bình": "Medium", Cao: "High" };
+    handleUpdate(updatePriorityMutation, { taskId: task._id, priority: priorityMap[val] }, "Đã cập nhật ưu tiên");
+  };
+
+  const updateDates = (field, val) => {
+    if (field === "due_date") {
+      handleUpdate(updateDueDateMutation, { taskId: task._id, dueDate: val }, "Đã cập nhật hạn chót");
+    } else if (field === "start_date") {
+      handleUpdate(updateStartDateMutation, { taskId: task._id, startDate: val }, "Đã cập nhật ngày bắt đầu");
     }
   };
 
-  // Status colors
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Chưa thực hiện": return "text-gray-600 bg-gray-50 border-gray-200";
-      case "Đang thực hiện": return "text-blue-600 bg-blue-50 border-blue-200";
-      case "Đã hoàn thành": return "text-green-600 bg-green-50 border-green-200";
-      default: return "text-gray-600 bg-gray-50 border-gray-200";
-    }
+  const updateAssignee = (newUserId) => {
+    if (!newUserId || newUserId === task.assigned_to?._id) return;
+    handleUpdate(updateAssigneeMutation, { taskId: task._id, userId: newUserId }, "Đã chuyển giao công việc");
   };
+
+  const statusMapReverse = { "To Do": "Chưa thực hiện", "In Progress": "Đang thực hiện", "Done": "Đã hoàn thành" };
+  const priorityMapReverse = { "Low": "Thấp", "Medium": "Trung bình", "High": "Cao" };
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden animate-fade-in sticky top-24">
-      {/* Header với gradient */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-5 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-md">
-            <Activity className="text-white" size={20} />
-          </div>
-          <h3 className="text-lg font-bold text-gray-800">Thông tin công việc</h3>
+    <div className="bg-white h-full relative">
+      
+      {isUpdating && (
+        <div className="absolute top-0 left-0 w-full h-1 bg-blue-100 overflow-hidden z-10">
+          <div className="h-full bg-blue-600 animate-progress"></div>
         </div>
-      </div>
+      )}
 
-      <div className="p-5 space-y-5">
-        {/* Error Alert */}
-        {error && (
-          <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl animate-shake">
-            <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={18} />
-            <p className="text-red-800 text-sm font-medium flex-1">{error}</p>
+      <div className="p-4 space-y-4">
+        
+        {!canEditGeneral && (
+          <div className="flex items-center gap-2 p-2 bg-gray-50 border border-gray-200 rounded-lg">
+            <Lock className="text-gray-400" size={12} />
+            <span className="text-xs text-gray-500 font-medium">Chỉ xem</span>
           </div>
         )}
 
-        {/* Permission Notice */}
-        {!hasEditPermission && (
-          <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-yellow-50 to-amber-50 border border-yellow-200 rounded-xl">
-            <div className="w-8 h-8 bg-yellow-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Lock className="text-yellow-700" size={16} />
-            </div>
-            <span className="text-sm text-yellow-800 font-medium">
-              Chỉ có quyền xem
-            </span>
-          </div>
-        )}
-
-        {/* Status & Priority Section */}
-        <div className="space-y-4">
-          {/* Status */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Trạng thái
-            </label>
-            <div className="relative">
-              <select
-                value={statusValue}
-                onChange={(e) => updateField("status", e.target.value)}
-                disabled={!hasEditPermission || updateTaskMutation.isPending}
-                className={`w-full border-2 rounded-xl p-3 pr-10 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all font-medium text-sm appearance-none ${
-                  getStatusColor(statusValue)
-                } ${!hasEditPermission ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:shadow-md"}`}
-              >
-                <option>Chưa thực hiện</option>
-                <option>Đang thực hiện</option>
-                <option>Đã hoàn thành</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Priority */}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-700 mb-2">
-              <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-              Độ ưu tiên
-            </label>
-            <div className="relative">
-              <select
-                value={priorityValue}
-                onChange={(e) => updateField("priority", e.target.value)}
-                disabled={!hasEditPermission || updateTaskMutation.isPending}
-                className={`w-full border-2 rounded-xl p-3 pr-10 focus:outline-none focus:ring-2 focus:ring-purple-500 transition-all font-medium text-sm appearance-none ${
-                  getPriorityColor(priorityValue)
-                } ${!hasEditPermission ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:shadow-md"}`}
-              >
-                <option>Thấp</option>
-                <option>Trung bình</option>
-                <option>Cao</option>
-              </select>
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Progress Section */}
-        <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-xl p-4 border border-gray-200">
-          <TaskProgressBar
-            progress={task.progress}
-            onChange={(val) => updateField("progress", val)}
-            disabled={!hasEditPermission || updateTaskMutation.isPending}
+        <div className="space-y-3">
+          <StatusSelect
+            value={statusMapReverse[task.status] || "Chưa thực hiện"}
+            onChange={(e) => updateStatus(e.target.value)}
+            disabled={!canEditGeneral || isUpdating}
+          />
+          <PrioritySelect
+            value={priorityMapReverse[task.priority] || "Trung bình"}
+            onChange={(e) => updatePriority(e.target.value)}
+            disabled={!canEditGeneral || isUpdating}
           />
         </div>
 
-        {/* Dates Section */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-            <h4 className="text-sm font-bold text-gray-700">Thời gian</h4>
-          </div>
-
-          {/* Start Date */}
-          <div className={`bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-3 transition-all ${
-            hasEditPermission ? "hover:shadow-md cursor-pointer" : ""
-          }`}>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Calendar className="text-blue-600" size={16} />
-                <span className="text-sm font-semibold text-gray-700">Ngày bắt đầu</span>
-              </div>
-              {editingDate === "start_date" && hasEditPermission ? (
-                <input
-                  type="date"
-                  value={formatDateForInput(task.start_date)}
-                  onChange={(e) => updateField("start_date", e.target.value)}
-                  onBlur={() => setEditingDate(null)}
-                  autoFocus
-                  className="border-2 border-blue-400 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              ) : (
-                <div
-                  onClick={() => hasEditPermission && setEditingDate("start_date")}
-                  className={`text-sm font-medium ${hasEditPermission ? "text-blue-600 hover:text-blue-700" : "text-gray-600"}`}
-                >
-                  {formatDateTime(task.start_date)}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Due Date */}
-          <div className={`bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-100 rounded-xl p-3 transition-all ${
-            hasEditPermission ? "hover:shadow-md cursor-pointer" : ""
-          }`}>
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-2">
-                <Calendar className="text-purple-600" size={16} />
-                <span className="text-sm font-semibold text-gray-700">Hạn hoàn thành</span>
-              </div>
-              {editingDate === "due_date" && hasEditPermission ? (
-                <input
-                  type="date"
-                  value={formatDateForInput(task.due_date)}
-                  onChange={(e) => updateField("due_date", e.target.value)}
-                  onBlur={() => setEditingDate(null)}
-                  autoFocus
-                  className="border-2 border-purple-400 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              ) : (
-                <div
-                  onClick={() => hasEditPermission && setEditingDate("due_date")}
-                  className={`text-sm font-medium ${hasEditPermission ? "text-purple-600 hover:text-purple-700" : "text-gray-600"}`}
-                >
-                  {formatDateTime(task.due_date)}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Created At */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-700">Ngày tạo</span>
-              <span className="text-sm text-gray-600">
-                {formatDateTime(task.created_at)}
-              </span>
-            </div>
-          </div>
-
-          {/* Updated At */}
-          <div className="bg-gray-50 border border-gray-200 rounded-xl p-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm font-semibold text-gray-700">Cập nhật</span>
-              <span className="text-sm text-gray-600">
-                {formatDateTime(task.updated_at)}
-              </span>
-            </div>
-          </div>
+        <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-lg p-3 border border-gray-200">
+          <TaskProgressBar
+            progress={task.progress}
+            onChange={updateProgress}
+            disabled={!canEditGeneral || isUpdating}
+          />
         </div>
 
-        {/* People Section */}
-        <div className="space-y-3">
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
-            <h4 className="text-sm font-bold text-gray-700">Người liên quan</h4>
-          </div>
+        <div className="pt-3 border-t border-gray-100">
+          <TaskDates
+            task={task}
+            onUpdateDate={updateDates}
+            hasEditPermission={canEditGeneral}
+            isUpdating={isUpdating}
+            projectStartDate={project?.start_date}
+            projectEndDate={project?.end_date}
+          />
+        </div>
 
-          {/* Creator */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <img
-                  src={getAvatarUrl(task.created_by)}
-                  alt={task.created_by?.full_name || "Creator"}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-blue-200 shadow-sm"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(task.created_by?.full_name || "C")}&background=3b82f6&color=fff`;
-                  }}
-                />
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-blue-500 rounded-full flex items-center justify-center border-2 border-white">
-                  <User className="text-white" size={12} />
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-blue-600 mb-1">Người tạo</p>
-                <p className="text-sm font-bold text-gray-800 truncate">
-                  {task.created_by?.full_name || task.created_by || "-"}
-                </p>
-                {task.created_by?.email && (
-                  <p className="text-xs text-gray-500 truncate">{task.created_by.email}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Assignee */}
-          <div className="bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-100 rounded-xl p-4 hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-3">
-              <div className="relative">
-                <img
-                  src={getAvatarUrl(task.assigned_to)}
-                  alt={task.assigned_to?.full_name || "Assignee"}
-                  className="w-12 h-12 rounded-full object-cover border-2 border-emerald-200 shadow-sm"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(task.assigned_to?.full_name || "A")}&background=10b981&color=fff`;
-                  }}
-                />
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center border-2 border-white">
-                  <UserCheck className="text-white" size={12} />
-                </div>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-semibold text-emerald-600 mb-1">Người được giao</p>
-                <p className="text-sm font-bold text-gray-800 truncate">
-                  {task.assigned_to?.full_name || task.assigned_to || "-"}
-                </p>
-                {task.assigned_to?.email && (
-                  <p className="text-xs text-gray-500 truncate">{task.assigned_to.email}</p>
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="pt-3 border-t border-gray-100">
+          <TaskPeople
+            task={task}
+            members={members}
+            onUpdateAssignee={updateAssignee}
+            canChangeAssignee={canChangeAssignee} 
+            isUpdating={isUpdating}
+          />
         </div>
       </div>
-
+      
       <style jsx>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(10px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes progress {
+          0% { width: 0%; margin-left: 0; }
+          50% { width: 50%; margin-left: 25%; }
+          100% { width: 100%; margin-left: 100%; }
         }
-        @keyframes shake {
-          0%, 100% { transform: translateX(0); }
-          25% { transform: translateX(-5px); }
-          75% { transform: translateX(5px); }
+        .animate-progress {
+          animation: progress 1s infinite linear;
         }
-        .animate-fade-in { animation: fade-in 0.5s ease-out; }
-        .animate-shake { animation: shake 0.3s ease-out; }
       `}</style>
     </div>
   );

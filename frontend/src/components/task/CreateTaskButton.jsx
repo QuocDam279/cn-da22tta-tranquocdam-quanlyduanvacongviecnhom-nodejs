@@ -1,11 +1,15 @@
-// ========================================
-// 2. CreateTaskButton.jsx - IMPROVED
-// ========================================
 import React, { useState } from "react";
 import { Plus } from "lucide-react";
 import TaskForm from "./TaskForm";
 
-export default function CreateTaskButton({ projectId, onCreated, members = [] }) {
+// ✅ Cập nhật props nhận vào
+export default function CreateTaskButton({ 
+  projectId, 
+  onCreated, 
+  members = [], 
+  projectStartDate, // Nhận từ ProjectDetail
+  projectEndDate    // Nhận từ ProjectDetail
+}) {
   const [showForm, setShowForm] = useState(false);
 
   return (
@@ -29,6 +33,9 @@ export default function CreateTaskButton({ projectId, onCreated, members = [] })
             onCreated?.();
             setShowForm(false);
           }}
+          // ✅ CHUYỂN TIẾP dữ liệu xuống TaskForm
+          projectStartDate={projectStartDate}
+          projectEndDate={projectEndDate}
         />
       )}
     </>

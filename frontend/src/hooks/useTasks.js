@@ -1,4 +1,3 @@
-// src/hooks/useTasks.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createTask,
@@ -8,13 +7,15 @@ import {
   deleteTask,
   getTaskStats,
   getMyTasks,
+  updateTaskStatus,
+  updateTaskProgress,
+  updateTaskPriority,
+  updateTaskAssignee,
+  updateTaskDueDate,
 } from '../services/taskService';
 
-// ========================
-// 🟦 QUERY HOOKS (GET)
-// ========================
+// --- QUERY HOOKS ---
 
-// Lấy tất cả task của user hiện tại
 export const useMyTasks = () => {
   return useQuery({
     queryKey: ['my-tasks'],
@@ -23,7 +24,6 @@ export const useMyTasks = () => {
   });
 };
 
-// Lấy tasks theo project
 export const useTasksByProject = (projectId) => {
   return useQuery({
     queryKey: ['tasks', 'project', projectId],
@@ -33,7 +33,6 @@ export const useTasksByProject = (projectId) => {
   });
 };
 
-// Lấy chi tiết task
 export const useTaskDetail = (taskId) => {
   return useQuery({
     queryKey: ['tasks', taskId],
@@ -44,7 +43,6 @@ export const useTaskDetail = (taskId) => {
   });
 };
 
-// Lấy thống kê task
 export const useTaskStats = (projectId = null) => {
   return useQuery({
     queryKey: projectId ? ['task-stats', projectId] : ['task-stats'],
@@ -53,11 +51,8 @@ export const useTaskStats = (projectId = null) => {
   });
 };
 
-// ========================
-// 🟩 MUTATION HOOKS
-// ========================
+// --- MUTATION HOOKS ---
 
-// Tạo task mới
 export const useCreateTask = () => {
   const queryClient = useQueryClient();
 
@@ -66,75 +61,131 @@ export const useCreateTask = () => {
     onSuccess: (data, variables) => {
       if (variables.project_id) {
         queryClient.invalidateQueries(['tasks', 'project', variables.project_id]);
-        // ✅ Invalidate project để cập nhật progress
         queryClient.invalidateQueries(['projects', variables.project_id]);
       }
-      queryClient.invalidateQueries(['my-tasks']);
-      queryClient.invalidateQueries(['my-projects']);
-      queryClient.invalidateQueries(['task-stats']);
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// ✅ CẬP NHẬT TASK (ĐÃ TỐI ƯU + ĐỒNG BỘ PROJECT)
 export const useUpdateTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ taskId, payload }) => updateTask(taskId, payload),
-
     onSuccess: (data, variables) => {
       const updatedTask = data.task ?? data;
+      queryClient.setQueryData(['tasks', variables.taskId], updatedTask);
 
-      // ✅ 1. Update cache chi tiết task (KHÔNG GET lại)
-      queryClient.setQueryData(
-        ['tasks', variables.taskId],
-        updatedTask
-      );
-
-      // ✅ 2. Invalidate danh sách task
       if (updatedTask.project_id) {
         queryClient.invalidateQueries(['tasks', 'project', updatedTask.project_id]);
-        
-        // ✅ 3. INVALIDATE PROJECT để cập nhật progress/stats
-        queryClient.invalidateQueries(['projects', updatedTask.project_id]);
       }
-
-      queryClient.invalidateQueries(['my-tasks']);
-      queryClient.invalidateQueries(['my-projects']);
-      queryClient.invalidateQueries(['task-stats']);
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// Xóa task
 export const useDeleteTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: deleteTask,
-
     onSuccess: (data, taskId) => {
-      const deletedTask = data.task ?? data;
-
-      // ❌ Xóa cache task detail
       queryClient.removeQueries(['tasks', taskId]);
-
-      // 🔄 Refresh list & stats
-      queryClient.invalidateQueries(['my-tasks']);
-      queryClient.invalidateQueries(['task-stats']);
-
-      // Invalidate toàn bộ project list
+      
       queryClient.invalidateQueries({
         queryKey: ['tasks', 'project'],
         exact: false,
       });
+      queryClient.invalidateQueries(['activities']);
+    },
+  });
+};
 
-      // ✅ INVALIDATE PROJECT nếu biết project_id
-      if (deletedTask?.project_id) {
-        queryClient.invalidateQueries(['projects', deletedTask.project_id]);
+// --- SPECIFIC UPDATE HOOKS & HELPER ---
+
+const invalidateTaskCaches = (queryClient, updatedTask) => {
+  if (updatedTask._id) {
+    queryClient.setQueryData(['tasks', updatedTask._id], updatedTask);
+  }
+  if (updatedTask.project_id) {
+    queryClient.invalidateQueries(['tasks', 'project', updatedTask.project_id]);
+  }
+  queryClient.invalidateQueries(['activities']);
+};
+
+export const useUpdateTaskStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, status }) => updateTaskStatus(taskId, status),
+    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+  });
+};
+
+export const useUpdateTaskProgress = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, progress }) => updateTaskProgress(taskId, progress),
+    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+  });
+};
+
+export const useUpdateTaskPriority = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, priority }) => updateTaskPriority(taskId, priority),
+    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+  });
+};
+
+export const useUpdateTaskAssignee = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, userId }) => updateTaskAssignee(taskId, userId),
+    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+  });
+};
+
+export const useUpdateTaskDueDate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, dueDate }) => updateTaskDueDate(taskId, dueDate),
+    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+  });
+};
+
+// ✅ ADDED: Hook cho Start Date (Sử dụng updateTask chung)
+export const useUpdateTaskStartDate = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ taskId, startDate }) => updateTask(taskId, { start_date: startDate }),
+    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+  });
+};
+
+// --- OPTIMISTIC UPDATE ---
+
+export const useOptimisticUpdateTask = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ taskId, updates, updateFn }) => updateFn(taskId, updates),
+    onMutate: async ({ taskId, updates }) => {
+      await queryClient.cancelQueries(['tasks', taskId]);
+      const previousTask = queryClient.getQueryData(['tasks', taskId]);
+      queryClient.setQueryData(['tasks', taskId], (old) => ({ ...old, ...updates }));
+      return { previousTask };
+    },
+    onSuccess: (data) => {
+      invalidateTaskCaches(queryClient, data.task ?? data);
+    },
+    onError: (err, { taskId }, context) => {
+      if (context?.previousTask) {
+        queryClient.setQueryData(['tasks', taskId], context.previousTask);
       }
-      queryClient.invalidateQueries(['my-projects']);
+    },
+    onSettled: (data, error, { taskId }) => {
+      queryClient.invalidateQueries(['tasks', taskId]);
     },
   });
 };

@@ -8,7 +8,8 @@ import {
   deleteProject,
   getMyProjects,
   recalcProjectProgress,
-  batchGetProjects
+  batchGetProjects,
+  deleteProjectsByTeam
 } from '../controllers/project.controller.js';
 
 const router = express.Router();
@@ -21,6 +22,9 @@ router.post('/', verifyToken, createProject);
 
 // 📋 Lấy tất cả dự án user tham gia
 router.get('/', verifyToken, getMyProjects);
+
+// 🗑️ Xóa tất cả projects thuộc team (gọi từ Team Service)
+router.delete('/cascade/team/:teamId', verifyToken, deleteProjectsByTeam);
 
 // 📂 Lấy dự án theo team
 router.get('/team/:teamId', verifyToken, getProjectsByTeam);

@@ -8,8 +8,18 @@ import {
 
 const router = express.Router();
 
-router.post('/:taskId', verifyToken, createComment);   
-router.get('/:taskId', verifyToken, getCommentsByTask);
+// Prefix: /api/comments (Giả sử bạn mount router này ở path đó)
+
+// 1. Lấy danh sách comment của 1 task
+// GET /api/comments/task/:taskId
+router.get('/task/:taskId', verifyToken, getCommentsByTask);
+
+// 2. Tạo comment mới
+// POST /api/comments/task/:taskId
+router.post('/task/:taskId', verifyToken, createComment);
+
+// 3. Xóa comment
+// DELETE /api/comments/:id
 router.delete('/:id', verifyToken, deleteComment);
 
 export default router;

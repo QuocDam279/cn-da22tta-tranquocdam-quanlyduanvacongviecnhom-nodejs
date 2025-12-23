@@ -2,57 +2,57 @@
 
 const API_URL = `${import.meta.env.VITE_API_URL}/tasks`;
 
-// Lấy token từ localStorage
-function getToken() {
-  return localStorage.getItem("token");
-}
-
-// Hàm chuẩn gọi API kèm token
+// --- HELPER: API REQUEST CHUẨN ---
 async function apiRequest(url, options = {}) {
+  const token = localStorage.getItem("token");
+  
   try {
     const res = await fetch(url, {
       ...options,
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${getToken()}`,
+        Authorization: token ? `Bearer ${token}` : "",
         ...(options.headers || {}),
       },
     });
 
-    // ✅ Xử lý trường hợp token hết hạn
+    // 1. Xử lý hết hạn token (401)
     if (res.status === 401) {
       localStorage.removeItem("token");
-      window.location.href = "/login"; // Hoặc dùng router.push('/login')
+      localStorage.removeItem("user"); // Xóa cả user info nếu có
+      window.location.href = "/login"; 
       throw new Error("Phiên đăng nhập hết hạn");
     }
 
-    // ✅ Kiểm tra xem response có phải JSON không
+    // 2. Kiểm tra content-type có phải JSON không
     const contentType = res.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
-      throw new Error(`Lỗi server: ${res.status} ${res.statusText}`);
+       // Trường hợp server trả về lỗi HTML hoặc text (500, 502...)
+       if (!res.ok) throw new Error(`Lỗi Server (${res.status})`);
+       return null; // Hoặc trả về text nếu cần
     }
 
     const data = await res.json();
     
+    // 3. Xử lý lỗi logic từ Backend trả về
     if (!res.ok) {
       throw new Error(data.message || `Lỗi API: ${res.status}`);
     }
     
     return data;
   } catch (error) {
-    // ✅ Xử lý lỗi network
+    // 4. Xử lý mất mạng / Server chết
     if (error.name === "TypeError" && error.message === "Failed to fetch") {
-      throw new Error("Không thể kết nối đến server");
+      throw new Error("Không thể kết nối đến server. Vui lòng kiểm tra mạng.");
     }
     throw error;
   }
 }
 
-// =====================================================
+// ========================
 // 🟦 TASK API
-// =====================================================
+// ========================
 
-// 🧱 Tạo task mới
 export function createTask(payload) {
   return apiRequest(API_URL, {
     method: "POST",
@@ -60,21 +60,14 @@ export function createTask(payload) {
   });
 }
 
-// 📋 Lấy task theo project
 export function getTasksByProject(projectId) {
-  return apiRequest(`${API_URL}/project/${projectId}`, {
-    method: "GET",
-  });
+  return apiRequest(`${API_URL}/project/${projectId}`);
 }
 
-// 🔍 Lấy chi tiết task
 export function getTaskById(taskId) {
-  return apiRequest(`${API_URL}/${taskId}`, {
-    method: "GET",
-  });
+  return apiRequest(`${API_URL}/${taskId}`);
 }
 
-// ✏️ Cập nhật task
 export function updateTask(taskId, payload) {
   return apiRequest(`${API_URL}/${taskId}`, {
     method: "PUT",
@@ -82,22 +75,61 @@ export function updateTask(taskId, payload) {
   });
 }
 
-// 🗑️ Xóa task
 export function deleteTask(taskId) {
-  return apiRequest(`${API_URL}/${taskId}`, {
-    method: "DELETE",
+  return apiRequest(`${API_URL}/${taskId}`, { method: "DELETE" });
+}
+
+export function getTaskStats(projectId = null) {
+  const url = projectId ? `${API_URL}/stats/${projectId}` : `${API_URL}/stats`;
+  return apiRequest(url);
+}
+
+export function getMyTasks() {
+  return apiRequest(`${API_URL}/my`);
+}
+
+// ========================
+// ✨ SPECIFIC UPDATES (Tối ưu performance)
+// ========================
+
+export function updateTaskStatus(taskId, status) {
+  return apiRequest(`${API_URL}/${taskId}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
 
-// 📊 Lấy thống kê task theo project hoặc của user
-export function getTaskStats(projectId = null) {
-  const url = projectId ? `${API_URL}/stats/${projectId}` : `${API_URL}/stats`;
-  return apiRequest(url, { method: "GET" });
+export function updateTaskProgress(taskId, progress) {
+  return apiRequest(`${API_URL}/${taskId}/progress`, {
+    method: "PATCH",
+    body: JSON.stringify({ progress }),
+  });
 }
 
-// 👤 Lấy tất cả task của user hiện tại
-export function getMyTasks() {
-  return apiRequest(`${API_URL}/my`, {
-    method: "GET",
+export function updateTaskPriority(taskId, priority) {
+  return apiRequest(`${API_URL}/${taskId}/priority`, {
+    method: "PATCH",
+    body: JSON.stringify({ priority }),
+  });
+}
+
+export function updateTaskAssignee(taskId, userId) {
+  return apiRequest(`${API_URL}/${taskId}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify({ assigned_to: userId }),
+  });
+}
+
+export function updateTaskDueDate(taskId, dueDate) {
+  return apiRequest(`${API_URL}/${taskId}/due-date`, {
+    method: "PATCH",
+    body: JSON.stringify({ due_date: dueDate }),
+  });
+}
+
+export function updateTaskStartDate(taskId, startDate) {
+  return apiRequest(`${API_URL}/${taskId}/start-date`, {
+    method: "PATCH",
+    body: JSON.stringify({ start_date: startDate }),
   });
 }

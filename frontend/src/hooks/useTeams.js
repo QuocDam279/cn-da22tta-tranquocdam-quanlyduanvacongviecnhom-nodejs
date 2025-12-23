@@ -1,4 +1,3 @@
-// src/hooks/useTeams.js
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   createTeam,
@@ -13,29 +12,26 @@ import {
 } from '../services/teamService';
 
 // ========================
-// 🟦 QUERY HOOKS (GET)
+// 🟦 QUERY HOOKS
 // ========================
 
-// Lấy tất cả team của user hiện tại
 export const useMyTeams = () => {
   return useQuery({
     queryKey: ['my-teams'],
     queryFn: getMyTeams,
-    staleTime: 5 * 60 * 1000, // cache 5 phút
+    staleTime: 5 * 60 * 1000, 
   });
 };
 
-// Lấy chi tiết 1 team
 export const useTeamDetail = (teamId) => {
   return useQuery({
     queryKey: ['teams', teamId],
     queryFn: () => getTeamById(teamId),
     enabled: !!teamId,
-    staleTime: 3 * 60 * 1000, // detail thường thay đổi nhanh hơn
+    staleTime: 2 * 60 * 1000, 
   });
 };
 
-// Lấy các team do user hiện tại tạo
 export const useLeaderTeams = () => {
   return useQuery({
     queryKey: ['leader-teams'],
@@ -45,10 +41,9 @@ export const useLeaderTeams = () => {
 };
 
 // ========================
-// 🟩 MUTATION HOOKS (CREATE, UPDATE, DELETE)
+// 🟩 MUTATION HOOKS
 // ========================
 
-// Tạo team mới
 export const useCreateTeam = () => {
   const queryClient = useQueryClient();
 
@@ -57,25 +52,40 @@ export const useCreateTeam = () => {
     onSuccess: () => {
       queryClient.invalidateQueries(['my-teams']);
       queryClient.invalidateQueries(['leader-teams']);
+      
+      // ✅ Cập nhật Timeline
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// Cập nhật thông tin team
 export const useUpdateTeam = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ teamId, payload }) => updateTeam(teamId, payload),
     onSuccess: (data, variables) => {
-      queryClient.invalidateQueries(['teams', variables.teamId]);
+      // ✅ Cập nhật cache trực tiếp (Backend trả về { message, team })
+      const updatedTeam = data.team || data;
+      
+      if (updatedTeam) {
+          queryClient.setQueryData(['teams', variables.teamId], (oldData) => {
+              if (!oldData) return updatedTeam;
+              // API getTeamById trả về { team: {...}, members: [...] }
+              // Nên ta chỉ update phần 'team' bên trong object đó
+              return { ...oldData, team: { ...oldData.team, ...updatedTeam } };
+          });
+      }
+
       queryClient.invalidateQueries(['my-teams']);
       queryClient.invalidateQueries(['leader-teams']);
+      
+      // ✅ Cập nhật Timeline
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// Xóa team
 export const useDeleteTeam = () => {
   const queryClient = useQueryClient();
 
@@ -85,11 +95,11 @@ export const useDeleteTeam = () => {
       queryClient.removeQueries(['teams', teamId]);
       queryClient.invalidateQueries(['my-teams']);
       queryClient.invalidateQueries(['leader-teams']);
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// Rời team
 export const useLeaveTeam = () => {
   const queryClient = useQueryClient();
 
@@ -97,23 +107,28 @@ export const useLeaveTeam = () => {
     mutationFn: leaveTeam,
     onSuccess: () => {
       queryClient.invalidateQueries(['my-teams']);
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// Thêm thành viên vào team
+// --- MEMBERS ---
+
 export const useAddMembers = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ teamId, userIds }) => addMembers(teamId, userIds),
     onSuccess: (data, variables) => {
+      // Refresh chi tiết team để hiện thành viên mới
       queryClient.invalidateQueries(['teams', variables.teamId]);
+      
+      // ✅ Cập nhật Timeline (quan trọng)
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// Xóa thành viên khỏi team
 export const useRemoveMember = () => {
   const queryClient = useQueryClient();
 
@@ -121,6 +136,9 @@ export const useRemoveMember = () => {
     mutationFn: ({ teamId, userId }) => removeMember(teamId, userId),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(['teams', variables.teamId]);
+      
+      // ✅ Cập nhật Timeline
+      queryClient.invalidateQueries(['activities']);
     },
   });
 };

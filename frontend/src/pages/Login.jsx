@@ -1,102 +1,65 @@
-// src/pages/Login.jsx
-
-import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import "../styles/login.css";
-
-import Button from "../components/common/Button";
-import FormInput from "../components/common/FormInput";
-import { login } from "../services/authService";
-import { useLoginForm } from "../hooks/useLoginForm";
+import { useNavigate } from "react-router-dom";
+import { useGoogleLogin } from "../hooks/useAuth";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { mutate: googleLogin } = useGoogleLogin();
 
-  const { form, errors, handleChange, validate } = useLoginForm({
-    email: "",
-    password: "",
-  });
-
-  const [message, setMessage] = useState({ type: "", text: "" });
-  const [loading, setLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
-
-    try {
-      setLoading(true);
-
-      const data = await login(form);
-
-      // lưu token + user
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-
-      setMessage({ type: "success", text: "Đăng nhập thành công!" });
-      setTimeout(() => navigate("/tongquan"), 2000);
-
-    } catch (err) {
-      setMessage({ type: "error", text: err.message });
-    } finally {
-      setLoading(false);
-    }
+  const handleGoogleLogin = () => {
+    // Lưu path hiện tại để redirect về sau khi login Google thành công
+    localStorage.setItem("redirectAfterLogin", "/tongquan");
+    
+    // Gọi Google OAuth (Redirect sang Google)
+    googleLogin();
   };
 
   return (
-    <div className="login-root">
-      <div className="hero">
-        <div className="card">
-          <div className="brand">
-            <div className="logo">QD</div>
-            <div className="title">QuestDo</div>
+    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-blue-100 to-blue-200 p-5">
+      <div className="w-full max-w-sm"> {/* Thu nhỏ max-w lại chút cho cân đối vì ít nội dung */}
+        <div className="bg-white/85 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/50 animate-fadeIn text-center">
+          
+          {/* Brand Logo */}
+          <div className="flex items-center justify-center gap-3 mb-8">
+            <div className="text-3xl font-bold text-blue-900 tracking-wide">
+              Quản lý công việc
+            </div>
           </div>
 
-          <h2 className="heading">Chào mừng trở lại</h2>
-          <p className="sub">Đăng nhập để tiếp tục</p>
+          {/* Heading */}
+          <h2 className="text-slate-800 text-xl font-semibold mb-2">
+            Xin chào!
+          </h2>
+          <p className="text-slate-500 text-sm mb-8">
+            Đăng nhập để quản lý dự án của bạn
+          </p>
 
-          <form className="form" onSubmit={handleSubmit}>
-            <FormInput
-              name="email"
-              type="email"
-              value={form.email}
-              onChange={handleChange}
-              label="Email"
-              error={errors.email}
-            />
+          {/* Google Login Button (Nút chính duy nhất) */}
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="
+              w-full py-3.5 px-4 rounded-xl font-semibold text-sm transition-all duration-200 
+              bg-white text-slate-700 border border-slate-200 shadow-sm
+              hover:bg-slate-50 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5
+              active:scale-95
+              flex items-center justify-center gap-3
+            "
+          >
+            {/* Google Icon SVG */}
+            <svg className="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            Tiếp tục với Google
+          </button>
 
-            <FormInput
-              name="password"
-              type={showPassword ? "text" : "password"}
-              value={form.password}
-              onChange={handleChange}
-              label="Mật khẩu"
-              error={errors.password}
-              icon={
-                <button
-                  type="button"
-                  className="show-password-btn"
-                  onClick={() => setShowPassword(v => !v)}
-                >
-                  {showPassword ? "Ẩn" : "Hiện"}
-                </button>
-              }
-            />
+          {/* Footer Note */}
+          <p className="mt-8 text-xs text-slate-400">
+            Hệ thống quản lý dự án và công việc nhóm &copy; 2025
+          </p>
 
-            <Button loading={loading}>Đăng nhập</Button>
-
-            <div className="register-link">
-              <span>Chưa có tài khoản?</span>
-              <Link to="/register">Đăng ký</Link>
-            </div>
-          </form>
-
-          {message.text && (
-            <div className={`message-overlay ${message.type}-toast`}>
-              {message.text}
-            </div>
-          )}
         </div>
       </div>
     </div>

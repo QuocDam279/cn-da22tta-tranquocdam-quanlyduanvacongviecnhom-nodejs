@@ -1,10 +1,9 @@
-// src/components/project/ProjectInfo.jsx
 import React from "react";
 import { Calendar, Clock, FileText } from "lucide-react";
 import ProjectActions from "./ProjectActions";
 import Status from "../dashboard/Status";
 
-export default function ProjectInfo({ project, tasks, taskLoading }) {
+export default function ProjectInfo({ project, tasks, taskLoading, onProjectUpdated }) {
   const formatDate = (dateStr) =>
     dateStr ? new Date(dateStr).toLocaleDateString("vi-VN") : "-";
 
@@ -18,7 +17,8 @@ export default function ProjectInfo({ project, tasks, taskLoading }) {
             {project.project_name}
           </h2>
         </div>
-        <ProjectActions project={project} />
+        {/* ✅ Truyền callback để update */}
+        <ProjectActions project={project} onUpdated={onProjectUpdated} />
       </div>
 
       {/* Main Content Grid */}
