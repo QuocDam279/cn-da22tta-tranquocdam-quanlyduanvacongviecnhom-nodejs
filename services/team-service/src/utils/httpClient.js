@@ -1,6 +1,4 @@
-// src/utils/httpClient.js
 import axios from 'axios';
-
 
 const http = {
   auth: axios.create({
@@ -9,23 +7,19 @@ const http = {
   }),
 
   project: axios.create({
-    baseURL: 'http://project-service:5003/api/projects', // 📡 Dự kiến Project Service
+    baseURL: 'http://project-service:5003/api/projects', // 📡 Project Service
     timeout: 5000
   }),
 
   notification: axios.create({
-    baseURL: 'http://notification-service:5004/api/notifications', // 📡 Dự kiến Notification Service
-    timeout: 5000
-  }),
-
-  activity: axios.create({
-    baseURL: 'http://activity-service:5007/api/activity-logs',
+    baseURL: 'http://notification-service:5005/api/notifications', // 📡 Notification Service
     timeout: 5000
   })
 
+  // Đã xóa Activity Service
 };
 
-// Middleware log (tuỳ chọn, giúp debug dễ hơn)
+// Middleware log
 for (const key in http) {
   http[key].interceptors.request.use(config => {
     console.log(`📡 [${key.toUpperCase()}] → ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);

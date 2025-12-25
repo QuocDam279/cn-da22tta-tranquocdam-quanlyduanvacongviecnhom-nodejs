@@ -3,15 +3,13 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 
 import Login from "./pages/Login";
-import GoogleCallback from "./pages/GoogleCallback"; // ← THÊM IMPORT
+import GoogleCallback from "./pages/GoogleCallback";
 import Dashboard from "./pages/Dashboard";
 import Team from "./pages/Team";
 import TeamDetail from "./pages/TeamDetail";
-import Project from "./pages/Project";
+// Giữ lại các trang Detail
 import ProjectDetail from "./pages/ProjectDetail";
-import Task from "./pages/Task";
 import TaskDetail from "./pages/TaskDetail";
-import Activity from "./pages/Activity";
 import UserProfilePage from "./pages/UserProfilePage";
 
 /* =======================
@@ -37,22 +35,13 @@ const toastOptions = {
     fontWeight: 500,
   },
   success: {
-    iconTheme: {
-      primary: "#22c55e",
-      secondary: "#ffffff",
-    },
+    iconTheme: { primary: "#22c55e", secondary: "#ffffff" },
   },
   error: {
-    iconTheme: {
-      primary: "#ef4444",
-      secondary: "#ffffff",
-    },
+    iconTheme: { primary: "#ef4444", secondary: "#ffffff" },
   },
   loading: {
-    iconTheme: {
-      primary: "#3b82f6",
-      secondary: "#ffffff",
-    },
+    iconTheme: { primary: "#3b82f6", secondary: "#ffffff" },
   },
 };
 
@@ -62,29 +51,30 @@ const toastOptions = {
 export default function App() {
   return (
     <>
-      {/* Global Toast */}
       <Toaster position="top-center" toastOptions={toastOptions} />
 
       <Routes>
         <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/login" element={<Login />} />
-        
-        {/* ← THÊM ROUTE NÀY */}
         <Route path="/auth/callback" element={<GoogleCallback />} />
 
+        {/* Tổng quan */}
         <Route path="/tongquan" element={<RequireAuth><Dashboard /></RequireAuth>} />
 
+        {/* Nhóm & Chi tiết Nhóm */}
         <Route path="/nhom" element={<RequireAuth><Team /></RequireAuth>} />
         <Route path="/nhom/:id" element={<RequireAuth><TeamDetail /></RequireAuth>} />
 
-        <Route path="/duan" element={<RequireAuth><Project /></RequireAuth>} />
+        {/* Chỉ giữ Chi tiết Dự án & Công việc (Loại bỏ trang danh sách) */}
         <Route path="/duan/:id" element={<RequireAuth><ProjectDetail /></RequireAuth>} />
-
-        <Route path="/congviec" element={<RequireAuth><Task /></RequireAuth>} />
         <Route path="/congviec/:id" element={<RequireAuth><TaskDetail /></RequireAuth>} />
 
-        <Route path="/nhatkyhoatdong" element={<RequireAuth><Activity /></RequireAuth>} />
+        {/* Profile */}
         <Route path="/profile" element={<RequireAuth><UserProfilePage /></RequireAuth>} />
+
+        {/* Loại bỏ hoàn toàn /nhatkyhoatdong */}
+        
+        <Route path="*" element={<Navigate to="/tongquan" replace />} />
       </Routes>
     </>
   );

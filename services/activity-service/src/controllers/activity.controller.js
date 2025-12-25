@@ -1,200 +1,165 @@
-// controllers/activityController.js
 import ActivityLog from '../models/ActivityLog.js';
 import http from '../utils/httpClient.js';
 
+// ==================================================================
+// CREATE LOG (Được gọi từ Task Service)
+// ==================================================================
 export const createActivityLog = async (req, res) => {
   try {
-    const { user_id, action, related_id, related_type } = req.body;
+    const { 
+      user_id, user_name, user_avatar, 
+      action, 
+      related_id, related_name,
+      team_id 
+    } = req.body;
 
-    if (!user_id || !action || !related_type) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: user_id, action, related_type'
-      });
-    }
-
-    if (!['task', 'project', 'team'].includes(related_type)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid related_type. Must be: task, project, or team'
-      });
+    // Validate cơ bản
+    if (!user_id || !action || !team_id) {
+       return res.status(400).json({ success: false, message: 'Thiếu thông tin bắt buộc (user_id, action, team_id)' });
     }
 
     const activityLog = await ActivityLog.create({
       user_id,
+      user_name,
+      user_avatar,
       action,
       related_id,
-      related_type
+      related_type: 'task',
+      related_name,
+      team_id // Quan trọng: lưu cái này để filter theo nhóm
     });
 
-    res.status(201).json({
-      success: true,
-      message: 'Activity log created successfully',
-      data: activityLog
-    });
+    res.status(201).json({ success: true, data: activityLog });
   } catch (error) {
-    console.error('Error creating activity log:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to create activity log',
-      error: error.message
-    });
+    console.error('❌ Create activity log error:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
+// ==================================================================
+// GET TEAM ACTIVITIES (Trưởng nhóm/Thành viên xem log của nhóm)
+// ==================================================================
+export const getTeamActivities = async (req, res) => {
+  try {
+    const { team_id } = req.params;
+    const { limit = 30, page = 1 } = req.query;
+    const authHeader = req.headers.authorization;
+
+    // 🔒 BƯỚC 1: KIỂM TRA QUYỀN (Gọi sang Team Service)
+    // Activity Service không biết ai thuộc nhóm nào, nên phải hỏi Team Service
+    try {
+      // Gọi API lấy chi tiết team (bao gồm members)
+      const { data: teamData } = await http.team.get(`/${team_id}`, {
+        headers: { Authorization: authHeader }
+      });
+
+      // Cấu trúc response thường là { members: [...] } hoặc { team: { members: [...] } }
+      // Bạn cần kiểm tra log response của Team Service để trỏ đúng
+      const members = teamData.members || teamData.team?.members || [];
+      
+      const isMember = members.some(m => 
+        (m.user_id._id || m.user_id).toString() === req.user.id
+      );
+
+      if (!isMember) {
+        return res.status(403).json({ 
+          success: false, 
+          message: 'Bạn không phải thành viên của nhóm này' 
+        });
+      }
+    } catch (teamError) {
+      console.error('❌ Lỗi khi gọi Team Service:', teamError.message);
+      // Nếu Team Service chết hoặc trả về 404
+      if (teamError.response?.status === 404) {
+         return res.status(404).json({ success: false, message: 'Nhóm không tồn tại' });
+      }
+      return res.status(500).json({ success: false, message: 'Không thể xác thực quyền truy cập nhóm' });
+    }
+
+    // 🔒 BƯỚC 2: QUERY DATABASE
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const activities = await ActivityLog.find({ team_id })
+      .sort({ created_at: -1 }) // Mới nhất lên đầu
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
+
+    const total = await ActivityLog.countDocuments({ team_id });
+
+    // Format dữ liệu trả về
+    const formattedData = activities.map(act => ({
+      _id: act._id,
+      action: act.action,
+      created_at: act.created_at,
+      related_info: {
+        id: act.related_id,
+        name: act.related_name,
+        type: act.related_type
+      },
+      user_info: {
+        _id: act.user_id,
+        full_name: act.user_name,
+        avatar: act.user_avatar
+      }
+    }));
+
+    res.status(200).json({
+      success: true,
+      data: formattedData,
+      pagination: {
+        page: parseInt(page),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      }
+    });
+  } catch (error) {
+    console.error('❌ Get team activities error:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// ==================================================================
+// GET USER ACTIVITIES (Cá nhân xem log của mình)
+// ==================================================================
 export const getUserActivities = async (req, res) => {
   try {
     const { user_id } = req.params;
-    const { limit = 50, page = 1, related_type } = req.query;
+    const { limit = 30, page = 1 } = req.query;
 
-    const query = { user_id };
-    if (related_type) query.related_type = related_type;
-
-    // Lấy activities
-    const activities = await ActivityLog.find(query)
-      .sort({ created_at: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .lean();
-
-    // Tạo map chứa tất cả related_id theo type
-    const grouped = activities.reduce((acc, activity) => {
-      if (activity.related_id) {
-        const type = activity.related_type;
-        if (!acc[type]) acc[type] = new Set();
-        acc[type].add(activity.related_id.toString());
-      }
-      return acc;
-    }, {});
-
-    // Fetch batch dữ liệu cho từng type
-    const relatedDataMap = {};
-    for (const [type, idSet] of Object.entries(grouped)) {
-      try {
-        const ids = Array.from(idSet);
-        const response = await http[type].get(`/batch?ids=${ids.join(',')}`);
-        const dataList = response.data?.data || [];
-        relatedDataMap[type] = {};
-        dataList.forEach(item => {
-          const itemId = (item._id || item.id).toString();
-          relatedDataMap[type][itemId] = item;
-        });
-      } catch (error) {
-        console.error(`Failed to fetch ${type} data:`, error.message);
-        relatedDataMap[type] = {};
-      }
+    // 🔒 Security Check
+    if (req.user.id !== user_id) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
     }
 
-    // Attach related_data cho activities
-    const enrichedActivities = activities.map(activity => {
-      const relatedData =
-        activity.related_id && relatedDataMap[activity.related_type]
-          ? relatedDataMap[activity.related_type][activity.related_id.toString()] || null
-          : null;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-      // Chuẩn hóa tên hiển thị để frontend không cần sửa
-      let displayName = 'Chưa xác định';
-      if (relatedData) {
-        displayName =
-          relatedData.name ||
-          relatedData.title ||
-          relatedData.project_name ||
-          relatedData.team_name ||
-          'Chưa xác định';
+    const activities = await ActivityLog.find({ user_id })
+      .sort({ created_at: -1 })
+      .limit(parseInt(limit))
+      .skip(skip)
+      .lean();
+
+    const total = await ActivityLog.countDocuments({ user_id });
+
+    const formattedData = activities.map(act => ({
+      ...act,
+      user_info: {
+        full_name: act.user_name,
+        avatar: act.user_avatar
       }
-
-      return {
-        ...activity,
-        related_data: { ...relatedData, displayName }
-      };
-    });
-
-    const total = await ActivityLog.countDocuments(query);
+    }));
 
     res.status(200).json({
       success: true,
-      data: enrichedActivities,
+      data: formattedData,
       pagination: {
         page: parseInt(page),
-        limit: parseInt(limit),
         total,
         pages: Math.ceil(total / parseInt(limit))
       }
     });
   } catch (error) {
-    console.error('Error fetching user activities:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch user activities',
-      error: error.message
-    });
-  }
-};
-
-export const getRelatedActivities = async (req, res) => {
-  try {
-    const { related_id, related_type } = req.params;
-    const { limit = 50, page = 1 } = req.query;
-
-    if (!['task', 'project', 'team'].includes(related_type)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid related_type'
-      });
-    }
-
-    const activities = await ActivityLog.find({ related_id, related_type })
-      .sort({ created_at: -1 })
-      .limit(parseInt(limit))
-      .skip((parseInt(page) - 1) * parseInt(limit))
-      .populate('user_id', 'name email')
-      .lean();
-
-    const total = await ActivityLog.countDocuments({ related_id, related_type });
-
-    res.status(200).json({
-      success: true,
-      data: activities,
-      pagination: {
-        page: parseInt(page),
-        limit: parseInt(limit),
-        total,
-        pages: Math.ceil(total / parseInt(limit))
-      }
-    });
-  } catch (error) {
-    console.error('Error fetching related activities:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to fetch related activities',
-      error: error.message
-    });
-  }
-};
-
-export const deleteActivityLog = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const activityLog = await ActivityLog.findByIdAndDelete(id);
-
-    if (!activityLog) {
-      return res.status(404).json({
-        success: false,
-        message: 'Activity log not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Activity log deleted successfully'
-    });
-  } catch (error) {
-    console.error('Error deleting activity log:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to delete activity log',
-      error: error.message
-    });
+    res.status(500).json({ success: false, message: error.message });
   }
 };

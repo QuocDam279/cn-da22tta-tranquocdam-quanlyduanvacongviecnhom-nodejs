@@ -41,12 +41,6 @@ export default function ProjectList({ projects, loading, error }) {
         <h3 className="text-lg font-semibold text-gray-700 mb-1">
           Chưa có dự án nào
         </h3>
-        <p className="text-sm text-gray-500 max-w-sm mx-auto">
-          Hãy tạo dự án đầu tiên để bắt đầu quản lý công việc nhóm của bạn!
-        </p>
-        <p className="text-xs text-gray-400 mt-3">
-          💡 Bấm nút "Tạo dự án" ở dưới để bắt đầu
-        </p>
       </div>
     );
   }

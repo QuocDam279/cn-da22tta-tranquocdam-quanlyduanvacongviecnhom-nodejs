@@ -92,17 +92,31 @@ export function getMyTasks() {
 // ✨ SPECIFIC UPDATES (Tối ưu performance)
 // ========================
 
-export function updateTaskStatus(taskId, status) {
+export function updateTaskStatus(taskId, status, progress) {
+  // Chuẩn bị body
+  const body = { status };
+  // Nếu có progress thì nhét thêm vào
+  if (progress !== undefined) {
+    body.progress = progress;
+  }
+
   return apiRequest(`${API_URL}/${taskId}/status`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(body),
   });
 }
 
-export function updateTaskProgress(taskId, progress) {
+export function updateTaskProgress(taskId, progress, status) {
+  // Chuẩn bị body
+  const body = { progress };
+  // Nếu có status thì nhét thêm vào
+  if (status) {
+    body.status = status;
+  }
+
   return apiRequest(`${API_URL}/${taskId}/progress`, {
     method: "PATCH",
-    body: JSON.stringify({ progress }),
+    body: JSON.stringify(body),
   });
 }
 

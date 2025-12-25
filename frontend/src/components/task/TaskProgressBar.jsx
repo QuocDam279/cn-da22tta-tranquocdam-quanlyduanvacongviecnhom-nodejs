@@ -6,6 +6,7 @@ export default function TaskProgressBar({ progress, onChange, disabled = false }
 
   // Sync với prop progress khi nó thay đổi từ bên ngoài
   useEffect(() => {
+    console.log("📊 [ProgressBar] Syncing internal state. Old:", value, "New:", progress);
     setValue(progress);
   }, [progress]);
 

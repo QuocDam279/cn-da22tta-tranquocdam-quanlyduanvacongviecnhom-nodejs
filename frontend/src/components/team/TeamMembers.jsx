@@ -10,7 +10,8 @@ import { useAddMembers, useRemoveMember, useLeaveTeam } from "../../hooks/useTea
 
 // Components
 import ConfirmDialog from "../common/ConfirmDialog";
-import TeamMemberItem from "./TeamMemberItem"; // Import file con vừa tạo
+import TeamMemberItem from "./TeamMemberItem";
+import MemberWorkModal from "./MemberWorkModal"; // ✨ Import modal mới
 
 export default function TeamMembers({
   teamId,
@@ -23,14 +24,15 @@ export default function TeamMembers({
   
   // State
   const [emailInput, setEmailInput] = useState("");
-  const [emailToSearch, setEmailToSearch] = useState(""); // Email trigger API
-  const [searchValue, setSearchValue] = useState(""); // Search local list
+  const [emailToSearch, setEmailToSearch] = useState("");
+  const [searchValue, setSearchValue] = useState("");
   const [error, setError] = useState("");
   
   // Modal State
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [memberToRemove, setMemberToRemove] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null); // ✨ State cho modal xem công việc
 
   // API Hooks
   const { data: findUserData } = useFindUserByEmail(emailToSearch);
@@ -52,7 +54,7 @@ export default function TeamMembers({
     const trimmedEmail = emailInput.trim();
     if (!trimmedEmail) return;
     setError("");
-    setEmailToSearch(trimmedEmail); // Trigger useEffect tìm user
+    setEmailToSearch(trimmedEmail);
   };
 
   const handleRemoveClick = (userId) => {
@@ -65,12 +67,16 @@ export default function TeamMembers({
     setShowLeaveConfirm(true);
   };
 
-  // --- EFFECTS (Logic thêm user khi tìm thấy) ---
+  // ✨ Handler mới: Xem công việc của thành viên
+  const handleMemberClick = (user) => {
+    setSelectedMember(user);
+  };
+
+  // --- EFFECTS ---
   useEffect(() => {
     if (!emailToSearch || !findUserData) return;
     const user = findUserData.user;
 
-    // Validate Logic
     if (!user) {
       toast.error("Không tìm thấy người dùng");
       setEmailToSearch("");
@@ -87,7 +93,6 @@ export default function TeamMembers({
       return;
     }
 
-    // Call API Add
     const loadingToast = toast.loading("Đang thêm thành viên...");
     addMembersMutation.mutate(
       { teamId, userIds: [user._id] },
@@ -148,7 +153,7 @@ export default function TeamMembers({
 
   return (
     <div className="space-y-6">
-      {/* 1. Header Actions (Add & Search) */}
+      {/* 1. Header Actions */}
       <div className="flex gap-4">
         {/* Input Add */}
         <div className="flex items-center gap-3 bg-white p-3 rounded-xl shadow-md border border-gray-200 w-1/2">
@@ -195,8 +200,9 @@ export default function TeamMembers({
             member={m}
             currentUserId={currentUserId}
             currentUserRole={currentUserRole}
-            onRemove={handleRemoveClick} // Truyền hàm xử lý xuống
-            onLeave={handleLeaveClick}   // Truyền hàm xử lý xuống
+            onRemove={handleRemoveClick}
+            onLeave={handleLeaveClick}
+            onMemberClick={handleMemberClick} // ✨ Truyền handler xuống
             loading={loading}
           />
         ))}
@@ -228,6 +234,15 @@ export default function TeamMembers({
           isLoading={leaveTeamMutation.isPending}
           onConfirm={confirmLeaveTeam}
           onCancel={() => setShowLeaveConfirm(false)}
+        />
+      )}
+
+      {/* ✨ Modal xem công việc */}
+      {selectedMember && (
+        <MemberWorkModal
+          member={selectedMember}
+          teamId={teamId}
+          onClose={() => setSelectedMember(null)}
         />
       )}
     </div>

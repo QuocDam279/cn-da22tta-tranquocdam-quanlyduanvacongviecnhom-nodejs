@@ -1,6 +1,4 @@
-// src/utils/httpClient.js
 import axios from 'axios';
-
 
 const http = {
   auth: axios.create({
@@ -13,19 +11,15 @@ const http = {
     timeout: 5000
   }),
 
-  activity: axios.create({
-    baseURL: 'http://activity-service:5007/api/activity-logs',
-    timeout: 5000
-  }),
+  // Đã xóa Activity Service
 
   task: axios.create({
     baseURL: 'http://task-service:5004/api/tasks', // 📡 Task Service
     timeout: 5000
   }),
-
 };
 
-// Middleware log (tuỳ chọn, giúp debug dễ hơn)
+// Middleware log
 for (const key in http) {
   http[key].interceptors.request.use(config => {
     console.log(`📡 [${key.toUpperCase()}] → ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);

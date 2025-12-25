@@ -1,4 +1,4 @@
-// utils/httpClient.js
+// services/activity-service/src/utils/httpClient.js
 import axios from 'axios';
 
 const createClient = (baseURL) => {
@@ -26,8 +26,6 @@ const createClient = (baseURL) => {
 };
 
 const http = {
-  task: createClient('http://task-service:5004/api/tasks'),
-  project: createClient('http://project-service:5003/api/projects'),
   team: createClient('http://team-service:5002/api/teams')
 };
 

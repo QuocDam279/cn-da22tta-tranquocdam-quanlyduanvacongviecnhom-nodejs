@@ -1,7 +1,5 @@
-// utils/activityLogger.js
 import http from './httpClient.js';
 
-// Map trạng thái tiếng Anh → tiếng Việt
 const statusMap = {
   "To Do": "Chưa thực hiện",
   "In Progress": "Đang thực hiện",
@@ -10,90 +8,102 @@ const statusMap = {
 };
 
 class ActivityLogger {
-  static async log({ user_id, action, related_id, token }) {
+  /**
+   * Hàm core gửi log sang Activity Service
+   */
+  static async log({ user, action, related_id, related_name, team_id, token }) {
     try {
-      if (!user_id || !action) {
-        console.error('❌ ActivityLogger: Missing required fields');
-        return;
-      }
+      if (!user || !action) return;
 
-      await http.activity.post(
-        '/',
-        {
-          user_id,
-          action,
-          related_id: related_id || null,
-          related_type: 'task'
-        },
-        {
-          headers: token ? { Authorization: token } : {}
-        }
-      );
-
-      console.log(`✓ Activity logged: ${action}`);
+      await http.activity.post('/', {
+        user_id: user.id || user._id,
+        user_name: user.name || user.full_name || "Thành viên",
+        user_avatar: user.avatar || "",
+        action,
+        related_id: related_id || null,
+        related_type: 'task',
+        related_name: related_name,
+        team_id: team_id // 🔥 Quan trọng: Để trưởng nhóm lọc log
+      }, {
+        headers: token ? { Authorization: token } : {}
+      });
     } catch (error) {
-      console.error(
-        '⚠️ Failed to log activity:',
-        error.response?.status || error.message
-      );
+      // Chỉ warn nhẹ, không làm crash luồng chính
+      console.warn('⚠️ ActivityLogger Error:', error.response?.status || error.message);
     }
   }
 
-  // 👉 Tạo task
-  static async logTaskCreated(user_id, task_id, taskName, token) {
-    const action = `Tạo công việc mới: ${taskName}`;
-    await this.log({ user_id, action, related_id: task_id, token });
+  static async logTaskCreated(user, task, teamId, token) {
+    await this.log({
+      user,
+      action: `đã tạo công việc: "${task.task_name}"`,
+      related_id: task._id,
+      related_name: task.task_name,
+      team_id: teamId,
+      token
+    });
   }
 
-  // 👉 Cập nhật task
-  static async logTaskUpdated(user_id, task_id, taskName, status, token) {
-    const vnStatus = statusMap[status] || status;
-    const action = status
-      ? `Cập nhật công việc: ${taskName} (${vnStatus})`
-      : `Cập nhật công việc: ${taskName}`;
-    await this.log({ user_id, action, related_id: task_id, token });
-  }
-
-  // 👉 Xóa task
-  static async logTaskDeleted(user_id, task_id, taskName, token) {
-    const action = `Xóa công việc: ${taskName}`;
-    await this.log({ user_id, action, related_id: task_id, token });
-  }
-
-  // 👉 Giao task
-  static async logTaskAssigned(user_id, task_id, taskName, assignedToName, token) {
-    const action = `Giao việc "${taskName}" cho ${assignedToName}`;
-    await this.log({ user_id, action, related_id: task_id, token });
-  }
-
-  // 👉 Đổi trạng thái task
-  static async logTaskStatusChanged(user_id, task_id, taskName, oldStatus, newStatus, token) {
+  static async logTaskStatusChanged(user, task, oldStatus, newStatus, teamId, token) {
     const oldVN = statusMap[oldStatus] || oldStatus;
     const newVN = statusMap[newStatus] || newStatus;
-
-    const action = `Thay đổi trạng thái: ${taskName} (${oldVN} → ${newVN})`;
-    await this.log({ user_id, action, related_id: task_id, token });
+    await this.log({
+      user,
+      action: `đã đổi trạng thái "${task.task_name}" từ [${oldVN}] sang [${newVN}]`,
+      related_id: task._id,
+      related_name: task.task_name,
+      team_id: teamId,
+      token
+    });
   }
 
-  // 👉 Cập nhật tiến độ
-  static async logTaskProgressUpdated(user_id, task_id, taskName, progress, token) {
-    const action = `Cập nhật tiến độ: ${taskName} (${progress}%)`;
-    await this.log({ user_id, action, related_id: task_id, token });
+  static async logTaskProgressUpdated(user, task, progress, teamId, token) {
+    await this.log({
+      user,
+      action: `đã cập nhật tiến độ "${task.task_name}" thành ${progress}%`,
+      related_id: task._id,
+      related_name: task.task_name,
+      team_id: teamId,
+      token
+    });
   }
-  // 👉 Ghi log hoạt động chung
-  static async logActivity({ user_id, action, related_type, related_id, related_data }) {
-      try {
-          // Gọi sang Activity Service
-          await http.activity.post('/', {
-              user_id,
-              action,
-              related_type,
-              related_id,
-              related_data
-          });
-      } catch (err) {
-          console.error("Activity Log Error:", err.message);
-      }
+
+  static async logTaskAssigned(user, task, assigneeName, teamId, token) {
+    await this.log({
+      user,
+      action: `đã giao công việc "${task.task_name}" cho ${assigneeName}`,
+      related_id: task._id,
+      related_name: task.task_name,
+      team_id: teamId,
+      token
+    });
+  }
+
+  // Dùng cho update chung (như đổi tên, mô tả)
+  static async logTaskGeneralUpdate(user, task, changes, teamId, token) {
+    // Chỉ log nếu thay đổi tên hoặc mô tả, bỏ qua priority/date ở đây nếu lỡ truyền vào
+    const keys = Object.keys(changes).filter(k => ['task_name', 'description'].includes(k));
+    if (keys.length === 0) return;
+
+    await this.log({
+      user,
+      action: `đã cập nhật thông tin công việc "${task.task_name}"`,
+      related_id: task._id,
+      related_name: task.task_name,
+      team_id: teamId,
+      token
+    });
+  }
+
+  static async logTaskDeleted(user, task_id, taskName, teamId, token) {
+    await this.log({
+      user,
+      action: `đã xóa công việc: "${taskName}"`,
+      related_id: task_id,
+      related_name: taskName,
+      team_id: teamId,
+      token
+    });
   }
 }
 

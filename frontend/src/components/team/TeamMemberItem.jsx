@@ -7,15 +7,28 @@ export default function TeamMemberItem({
   currentUserId, 
   currentUserRole, 
   onRemove, 
-  onLeave, 
+  onLeave,
+  onMemberClick, // ✨ Thêm prop này
   loading 
 }) {
   const user = member.user;
 
+  const handleMemberClick = () => {
+    // Chỉ cho phép click vào các thành viên khác (không phải chính mình)
+    if (user?._id !== currentUserId && onMemberClick) {
+      onMemberClick(user);
+    }
+  };
+
   return (
     <div className="flex justify-between items-center p-4 hover:bg-gray-50 transition-colors">
-      {/* Avatar + Info */}
-      <div className="flex items-center gap-3">
+      {/* Avatar + Info - Clickable */}
+      <div 
+        className={`flex items-center gap-3 flex-1 ${
+          user?._id !== currentUserId ? 'cursor-pointer' : ''
+        }`}
+        onClick={handleMemberClick}
+      >
         <UserAvatar user={user} className="w-12 h-12" />
         <div>
           <p className="font-semibold text-gray-800">{user?.full_name}</p>

@@ -1,145 +1,54 @@
 import express from 'express';
 import { verifyToken } from '../middleware/auth.middleware.js';
+
+// Import Query Controllers (Read)
 import {
-  createTask,
   getTasksByProject,
   getTaskById,
-  updateTask,
-  deleteTask,
+  getMyTasks,
   getTaskStatsByProject,
   getTaskStatsByUser,
-  getMyTasks,
-  getAllTasks,
-  batchGetTasks,
+  batchGetTasks
+} from '../controllers/task.query.js';
+
+// Import Command Controllers (Write)
+import {
+  createTask,
+  updateTask,
+  deleteTask,
   deleteTasksByProject,
   updateTaskStatus,
   updateTaskProgress,
   updateTaskPriority,
   updateTaskAssignee,
   updateTaskDueDate
-} from '../controllers/task.controller.js';
+} from '../controllers/task.command.js';
 
 const router = express.Router();
 
-// =====================================================
-// 📦 INTERNAL / BATCH ROUTES
-// =====================================================
-
-/**
- * Lấy nhiều task theo ID
- * GET /api/tasks/batch?ids=id1,id2
- */
+// --- BATCH & STATS ---
 router.get('/batch', batchGetTasks);
-
-/**
- * Lấy toàn bộ task
- * GET /api/tasks/internal/all
- */
-router.get('/internal/all', getAllTasks);
-
-
-// =====================================================
-// 👤 GENERAL ROUTES
-// =====================================================
-
-/**
- * Tạo công việc mới
- * POST /api/tasks
- */
-router.post('/', verifyToken, createTask);
-
-/**
- * Lấy tất cả task được giao cho user hiện tại
- * GET /api/tasks/my
- */
-router.get('/my', verifyToken, getMyTasks);
-
-/**
- * Thống kê task của user (trên tất cả dự án)
- * GET /api/tasks/stats
- */
 router.get('/stats', verifyToken, getTaskStatsByUser);
-
-
-// =====================================================
-// 📋 PROJECT CONTEXT ROUTES
-// =====================================================
-
-/**
- * 🗑️ Xóa tất cả task thuộc một dự án (CASCADE DELETE)
- * ⚠️ PHẢI ĐẶT TRƯỚC /project/:projectId để tránh conflict
- * DELETE /api/tasks/cascade/project/:projectId
- */
-router.delete('/cascade/project/:projectId', verifyToken, deleteTasksByProject);
-
-/**
- * Lấy danh sách task của một dự án
- * GET /api/tasks/project/:projectId
- */
-router.get('/project/:projectId', verifyToken, getTasksByProject);
-
-/**
- * Thống kê task trong một dự án
- * GET /api/tasks/stats/:projectId
- */
 router.get('/stats/:projectId', verifyToken, getTaskStatsByProject);
 
-
-// =====================================================
-// ✨ SPECIFIC UPDATE ROUTES
-// =====================================================
-
-/**
- * Cập nhật Trạng thái
- * PATCH /api/tasks/:id/status
- */
-router.patch('/:id/status', verifyToken, updateTaskStatus);
-
-/**
- * Cập nhật Tiến độ
- * PATCH /api/tasks/:id/progress
- */
-router.patch('/:id/progress', verifyToken, updateTaskProgress);
-
-/**
- * Cập nhật Mức độ ưu tiên
- * PATCH /api/tasks/:id/priority
- */
-router.patch('/:id/priority', verifyToken, updateTaskPriority);
-
-/**
- * Chuyển giao công việc
- * PATCH /api/tasks/:id/assign
- */
-router.patch('/:id/assign', verifyToken, updateTaskAssignee);
-
-/**
- * Cập nhật Hạn chót
- * PATCH /api/tasks/:id/due-date
- */
-router.patch('/:id/due-date', verifyToken, updateTaskDueDate);
-
-
-// =====================================================
-// 🔍 SPECIFIC GENERAL ROUTES (ĐẶT CUỐI CÙNG)
-// =====================================================
-
-/**
- * Lấy chi tiết 1 task
- * GET /api/tasks/:id
- */
+// --- GENERAL READ ---
+router.get('/my', verifyToken, getMyTasks);
+router.get('/project/:projectId', verifyToken, getTasksByProject);
 router.get('/:id', verifyToken, getTaskById);
 
-/**
- * Cập nhật thông tin chung
- * PUT /api/tasks/:id
- */
-router.put('/:id', verifyToken, updateTask);
+// --- PROJECT CASCADING ---
+router.delete('/cascade/project/:projectId', verifyToken, deleteTasksByProject);
 
-/**
- * Xóa task
- * DELETE /api/tasks/:id
- */
+// --- SPECIFIC UPDATES ---
+router.patch('/:id/status', verifyToken, updateTaskStatus);
+router.patch('/:id/progress', verifyToken, updateTaskProgress);
+router.patch('/:id/priority', verifyToken, updateTaskPriority);
+router.patch('/:id/assign', verifyToken, updateTaskAssignee);
+router.patch('/:id/due-date', verifyToken, updateTaskDueDate);
+
+// --- CORE CRUD ---
+router.post('/', verifyToken, createTask);
+router.put('/:id', verifyToken, updateTask);
 router.delete('/:id', verifyToken, deleteTask);
 
 export default router;

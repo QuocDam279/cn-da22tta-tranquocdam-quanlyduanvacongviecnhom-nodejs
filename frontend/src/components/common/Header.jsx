@@ -1,31 +1,23 @@
 import React, { useState, useRef, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
-import {
-  Users,
-  Settings,
-  LogOut,
-  LayoutDashboard
-} from "lucide-react";
+import { Users, Settings, LogOut, LayoutDashboard } from "lucide-react";
 
 import { useProfile } from "../../hooks/useProfile";
 import { useLogout } from "../../hooks/useAuth";
 import NotificationDropdown from "./NotificationDropdown";
-import GlobalSearch from "./GlobalSearch";
-// 👇 Import component dùng chung
+import GlobalSearch from "../common/GlobalSearch"; // ✅ Đã uncomment
 import UserAvatar from "../common/UserAvatar";
 
 export default function Header() {
   const navigate = useNavigate();
-  const { mutate: logoutMutation } = useLogout();
-
   const [openAvatar, setOpenAvatar] = useState(false);
   const avatarRef = useRef(null);
 
   const { data: profileData } = useProfile();
   const user = profileData?.user;
+  const { mutate: logout } = useLogout();
 
-  // 🗑️ ĐÃ XÓA: Logic xử lý URL và fallback ở đây vì UserAvatar đã lo hết rồi
-
+  // Đóng dropdown user khi click ra ngoài
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (avatarRef.current && !avatarRef.current.contains(e.target)) {
@@ -37,40 +29,39 @@ export default function Header() {
   }, []);
 
   const handleLogout = () => {
-    logoutMutation(undefined, {
-      onSuccess: () => navigate("/login"),
-    });
+    logout();
   };
 
   const menuItems = [
-    { name: "Tổng quan", path: "/tongquan", icon: <LayoutDashboard size={16} /> },
-    { name: "Nhóm dự án", path: "/nhom", icon: <Users size={16} /> },
+    { name: "Tổng quan", path: "/tongquan", icon: <LayoutDashboard size={18} /> },
+    { name: "Nhóm dự án", path: "/nhom", icon: <Users size={18} /> },
   ];
 
   return (
-    <header className="fixed top-0 left-0 w-full h-14 bg-indigo-950 border-b border-indigo-900 z-50">
-      <div className="h-full px-6 flex items-center justify-between gap-6">
-
-        {/* ===== LEFT ===== */}
-        <div className="flex items-center gap-6">
-          <span
+    <header className="fixed top-0 left-0 w-full h-16 bg-indigo-950 border-b border-indigo-900 z-40 shadow-sm">
+      <div className="h-full px-4 md:px-6 flex items-center justify-between gap-4">
+        
+        {/* ===== LEFT: Logo & Nav ===== */}
+        <div className="flex items-center gap-8">
+          <div
             onClick={() => navigate("/tongquan")}
-            className="cursor-pointer select-none text-lg font-extrabold text-white tracking-wide"
+            className="cursor-pointer flex items-center gap-2 group"
           >
-            Quản lý công việc
-          </span>
+            <span className="hidden md:block text-lg font-bold text-white tracking-tight">
+              Quản lý công việc
+            </span>
+          </div>
 
-          <nav className="flex items-center gap-2">
+          <nav className="hidden md:flex items-center gap-1">
             {menuItems.map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
                 className={({ isActive }) =>
-                  `flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition
-                  ${
-                    isActive
-                      ? "bg-indigo-700 text-white"
-                      : "text-indigo-200 hover:bg-indigo-900 hover:text-white"
+                  `flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200
+                  ${isActive
+                    ? "bg-indigo-800/80 text-white shadow-inner"
+                    : "text-indigo-200 hover:bg-white/10 hover:text-white"
                   }`
                 }
               >
@@ -81,61 +72,54 @@ export default function Header() {
           </nav>
         </div>
 
-        {/* ===== CENTER ===== */}
-        <GlobalSearch />
+        {/* ===== CENTER: Search Component ===== */}
+        {/* ✅ Thay thế placeholder bằng Component thật */}
+        <div className="flex-1 max-w-md hidden md:block">
+           <GlobalSearch />
+        </div>
 
-        {/* ===== RIGHT ===== */}
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <div className="w-9 h-9 rounded-full border border-indigo-500 flex items-center justify-center hover:bg-indigo-900 transition">
-              <NotificationDropdown />
-            </div>
-          </div>
+        {/* ===== RIGHT: Actions ===== */}
+        <div className="flex items-center gap-3 md:gap-4">
+          <NotificationDropdown />
 
+          {/* User Dropdown */}
           <div className="relative" ref={avatarRef}>
-            <button onClick={() => setOpenAvatar(!openAvatar)}>
-              {/* ✅ SỬ DỤNG COMPONENT CHUNG */}
-              {/* Chúng ta ghi đè className để có viền và hiệu ứng riêng cho Header */}
-              <UserAvatar 
-                user={user} 
-                className="
-                  w-9 h-9 
-                  border-2 border-indigo-500 
-                  ring-1 ring-indigo-900 
-                  hover:ring-indigo-500 hover:scale-105 
-                  transition
-                "
+            <button
+              onClick={() => setOpenAvatar(!openAvatar)}
+              className="flex items-center gap-2 rounded-full hover:bg-white/5 p-1 pr-2 transition border border-transparent hover:border-indigo-800"
+            >
+              <UserAvatar
+                user={user}
+                className="w-8 h-8 md:w-9 md:h-9 border-2 border-indigo-400 rounded-full"
               />
+              <span className="hidden lg:block text-sm font-medium text-indigo-100 max-w-[100px] truncate">
+                {user?.full_name || "User"}
+              </span>
             </button>
 
             {openAvatar && (
-              <div className="absolute right-0 mt-2 w-60 bg-white rounded-2xl shadow-xl border z-50 animate-fadeIn">
-                <div className="px-4 py-3 border-b bg-slate-50 rounded-t-2xl">
-                  <p className="font-bold text-sm truncate text-gray-800">
-                    {user?.full_name}
-                  </p>
-                  <p className="text-xs text-slate-500 truncate">
-                    {user?.email}
-                  </p>
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-xl shadow-xl border border-slate-100 z-50 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+                <div className="px-5 py-4 bg-slate-50 border-b">
+                  <p className="font-bold text-slate-800 truncate">{user?.full_name}</p>
+                  <p className="text-xs text-slate-500 truncate">{user?.email}</p>
                 </div>
-
-                <button
-                  onClick={() => navigate("/profile")}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-slate-100 w-full text-gray-700 transition-colors"
-                >
-                  <Settings size={18} />
-                  Cài đặt tài khoản
-                </button>
-
-                <div className="border-t my-1"></div>
-
-                <button
-                  onClick={handleLogout}
-                  className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full font-medium transition-colors"
-                >
-                  <LogOut size={18} />
-                  Đăng xuất
-                </button>
+                <div className="p-1">
+                  <button
+                    onClick={() => { setOpenAvatar(false); navigate("/profile"); }}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-lg w-full transition"
+                  >
+                    <Settings size={16} />
+                    Cài đặt tài khoản
+                  </button>
+                  <div className="border-t my-1 mx-2"></div>
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 rounded-lg w-full transition font-medium"
+                  >
+                    <LogOut size={16} />
+                    Đăng xuất
+                  </button>
+                </div>
               </div>
             )}
           </div>

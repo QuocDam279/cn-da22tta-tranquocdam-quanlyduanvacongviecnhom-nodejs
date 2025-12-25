@@ -1,24 +1,19 @@
-// routes/activityRoutes.js
 import express from 'express';
+import { verifyToken } from '../middleware/auth.middleware.js';
 import {
   createActivityLog,
   getUserActivities,
-  getRelatedActivities,
-  deleteActivityLog
+  getTeamActivities,
 } from '../controllers/activity.controller.js';
 
 const router = express.Router();
 
-// Create new activity log
-router.post('/', createActivityLog);
+// --- PRIVATE (Nội bộ microservices gọi) ---
+router.post('/', createActivityLog); 
 
-// Get activities by user
-router.get('/user/:user_id', getUserActivities);
-
-// Get activities by related entity (task/project/team)
-router.get('/:related_type/:related_id', getRelatedActivities);
-
-// Delete activity log
-router.delete('/:id', deleteActivityLog);
+// --- PUBLIC (Cho Frontend gọi) ---
+// 🔒 BẮT BUỘC phải verify token
+router.get('/team/:team_id', verifyToken, getTeamActivities);
+router.get('/user/:user_id', verifyToken, getUserActivities);
 
 export default router;

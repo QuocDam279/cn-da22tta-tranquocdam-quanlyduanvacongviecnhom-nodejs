@@ -14,7 +14,7 @@ import {
   updateTaskDueDate,
 } from '../services/taskService';
 
-// --- QUERY HOOKS ---
+// --- QUERY HOOKS (Giữ nguyên) ---
 
 export const useMyTasks = () => {
   return useQuery({
@@ -51,6 +51,42 @@ export const useTaskStats = (projectId = null) => {
   });
 };
 
+// --- 🔥 HELPER: CẬP NHẬT CACHE THÔNG MINH 🔥 ---
+
+/**
+ * Hàm này sẽ tìm Task trong danh sách đã cache và cập nhật nó
+ * thay vì bắt server gửi lại toàn bộ danh sách.
+ */
+const updateTaskInCache = (queryClient, updatedTask) => {
+  if (!updatedTask) return;
+
+  // 1. Cập nhật trang chi tiết task (nếu đang mở)
+  queryClient.setQueryData(['tasks', updatedTask._id], (oldData) => {
+    // Nếu cache chi tiết chưa có, hoặc khác ID, giữ nguyên
+    if (!oldData) return updatedTask;
+    return { ...oldData, ...updatedTask };
+  });
+
+  // 2. Cập nhật trong danh sách Task của Project (QUAN TRỌNG NHẤT)
+  if (updatedTask.project_id) {
+    queryClient.setQueryData(['tasks', 'project', updatedTask.project_id], (oldList) => {
+      if (!oldList) return oldList;
+      // Tìm và thay thế task trong mảng
+      return oldList.map((t) => (t._id === updatedTask._id ? { ...t, ...updatedTask } : t));
+    });
+  }
+
+  // 3. Cập nhật trong danh sách "My Tasks"
+  queryClient.setQueryData(['my-tasks'], (oldList) => {
+    if (!oldList) return oldList;
+    return oldList.map((t) => (t._id === updatedTask._id ? { ...t, ...updatedTask } : t));
+  });
+
+  // 4. Activity Logs: KHÔNG invalidate ngay lập tức với các thay đổi nhỏ (như progress)
+  // Chỉ invalidate khi cần thiết hoặc chấp nhận độ trễ để giảm tải
+  // queryClient.invalidateQueries(['activities']); // <-- Tạm tắt hoặc debounce cái này
+};
+
 // --- MUTATION HOOKS ---
 
 export const useCreateTask = () => {
@@ -59,28 +95,26 @@ export const useCreateTask = () => {
   return useMutation({
     mutationFn: createTask,
     onSuccess: (data, variables) => {
+      // Create thì bắt buộc phải invalidate để lấy ID mới và sort lại
       if (variables.project_id) {
         queryClient.invalidateQueries(['tasks', 'project', variables.project_id]);
-        queryClient.invalidateQueries(['projects', variables.project_id]);
+        queryClient.invalidateQueries(['task-stats', variables.project_id]); // Cập nhật thống kê
       }
       queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
+// 🔥 Sửa useUpdateTask để dùng Helper
 export const useUpdateTask = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ taskId, payload }) => updateTask(taskId, payload),
-    onSuccess: (data, variables) => {
-      const updatedTask = data.task ?? data;
-      queryClient.setQueryData(['tasks', variables.taskId], updatedTask);
-
-      if (updatedTask.project_id) {
-        queryClient.invalidateQueries(['tasks', 'project', updatedTask.project_id]);
-      }
-      queryClient.invalidateQueries(['activities']);
+    onSuccess: (data) => {
+        // Backend trả về { message, task } hoặc object task trực tiếp
+        const taskData = data.task || data; 
+        updateTaskInCache(queryClient, taskData);
     },
   });
 };
@@ -91,42 +125,41 @@ export const useDeleteTask = () => {
   return useMutation({
     mutationFn: deleteTask,
     onSuccess: (data, taskId) => {
+      // Xóa cache chi tiết
       queryClient.removeQueries(['tasks', taskId]);
       
-      queryClient.invalidateQueries({
-        queryKey: ['tasks', 'project'],
-        exact: false,
+      // Xóa task khỏi cache danh sách (Không cần gọi API lại)
+      queryClient.setQueriesData({ queryKey: ['tasks', 'project'] }, (oldList) => {
+         if (!oldList) return oldList;
+         return oldList.filter(t => t._id !== taskId);
       });
+
+      // Vẫn nên invalidate stats vì số lượng thay đổi
+      queryClient.invalidateQueries(['task-stats']);
       queryClient.invalidateQueries(['activities']);
     },
   });
 };
 
-// --- SPECIFIC UPDATE HOOKS & HELPER ---
+// --- SPECIFIC UPDATE HOOKS (Đã tối ưu) ---
 
-const invalidateTaskCaches = (queryClient, updatedTask) => {
-  if (updatedTask._id) {
-    queryClient.setQueryData(['tasks', updatedTask._id], updatedTask);
-  }
-  if (updatedTask.project_id) {
-    queryClient.invalidateQueries(['tasks', 'project', updatedTask.project_id]);
-  }
-  queryClient.invalidateQueries(['activities']);
-};
+// Các hook này giờ gọi updateTaskInCache thay vì invalidate toàn bộ
 
 export const useUpdateTaskStatus = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, status }) => updateTaskStatus(taskId, status),
-    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+    // 🔥 SỬA: Nhận thêm biến progress từ object variables
+    mutationFn: ({ taskId, status, progress }) => updateTaskStatus(taskId, status, progress),
+    onSuccess: (data) => updateTaskInCache(queryClient, data.task ?? data),
   });
 };
 
 export const useUpdateTaskProgress = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ taskId, progress }) => updateTaskProgress(taskId, progress),
-    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+    // 🔥 SỬA: Nhận thêm biến status từ object variables
+    mutationFn: ({ taskId, progress, status }) => updateTaskProgress(taskId, progress, status),
+    onSuccess: (data) => updateTaskInCache(queryClient, data.task ?? data),
   });
 };
 
@@ -134,7 +167,7 @@ export const useUpdateTaskPriority = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, priority }) => updateTaskPriority(taskId, priority),
-    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+    onSuccess: (data) => updateTaskInCache(queryClient, data.task ?? data),
   });
 };
 
@@ -142,7 +175,11 @@ export const useUpdateTaskAssignee = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, userId }) => updateTaskAssignee(taskId, userId),
-    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+    onSuccess: (data) => {
+        updateTaskInCache(queryClient, data.task ?? data);
+        // Riêng Assignee thay đổi có thể cần reload activities để hiện thông báo
+        queryClient.invalidateQueries(['activities']); 
+    },
   });
 };
 
@@ -150,42 +187,14 @@ export const useUpdateTaskDueDate = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, dueDate }) => updateTaskDueDate(taskId, dueDate),
-    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
+    onSuccess: (data) => updateTaskInCache(queryClient, data.task ?? data),
   });
 };
 
-// ✅ ADDED: Hook cho Start Date (Sử dụng updateTask chung)
 export const useUpdateTaskStartDate = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ taskId, startDate }) => updateTask(taskId, { start_date: startDate }),
-    onSuccess: (data) => invalidateTaskCaches(queryClient, data.task ?? data),
-  });
-};
-
-// --- OPTIMISTIC UPDATE ---
-
-export const useOptimisticUpdateTask = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: ({ taskId, updates, updateFn }) => updateFn(taskId, updates),
-    onMutate: async ({ taskId, updates }) => {
-      await queryClient.cancelQueries(['tasks', taskId]);
-      const previousTask = queryClient.getQueryData(['tasks', taskId]);
-      queryClient.setQueryData(['tasks', taskId], (old) => ({ ...old, ...updates }));
-      return { previousTask };
-    },
-    onSuccess: (data) => {
-      invalidateTaskCaches(queryClient, data.task ?? data);
-    },
-    onError: (err, { taskId }, context) => {
-      if (context?.previousTask) {
-        queryClient.setQueryData(['tasks', taskId], context.previousTask);
-      }
-    },
-    onSettled: (data, error, { taskId }) => {
-      queryClient.invalidateQueries(['tasks', taskId]);
-    },
+    onSuccess: (data) => updateTaskInCache(queryClient, data.task ?? data),
   });
 };

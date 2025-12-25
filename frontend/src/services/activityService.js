@@ -1,12 +1,29 @@
 // src/services/activityService.js
 const API_URL = `${import.meta.env.VITE_API_URL}/activity-logs`;
 
+// ========================
+// 🔧 HELPER FUNCTIONS
+// ========================
+
 // Lấy token từ localStorage
 function getToken() {
   return localStorage.getItem("token");
 }
 
-// Hàm chuẩn gọi API có token
+// Lấy User ID từ localStorage
+function getCurrentUserId() {
+  try {
+    const userStr = localStorage.getItem("user");
+    if (!userStr) return null;
+    const user = JSON.parse(userStr);
+    return user.id || user._id;
+  } catch (e) {
+    console.error("Error parsing user from localStorage:", e);
+    return null;
+  }
+}
+
+// Generic API request helper
 async function apiRequest(url, options = {}) {
   const token = getToken();
   
@@ -20,86 +37,88 @@ async function apiRequest(url, options = {}) {
   });
 
   const data = await res.json();
+  
   if (!res.ok) {
-    throw new Error(data.message || "API Error");
+    throw new Error(data.message || `API Error: ${res.status}`);
   }
-
+  
   return data;
 }
 
-// ========================
-// 🔧 HELPER: Build clean query string
-// ========================
+// Build query string từ object params
 function buildQueryString(params = {}) {
-  // Lọc bỏ các giá trị undefined, null, empty string
   const cleanParams = Object.entries(params).reduce((acc, [key, value]) => {
-    if (value !== undefined && value !== null && value !== '') {
+    if (value !== undefined && value !== null && value !== "") {
       acc[key] = value;
     }
     return acc;
   }, {});
   
   const queryString = new URLSearchParams(cleanParams).toString();
-  return queryString ? `?${queryString}` : '';
+  return queryString ? `?${queryString}` : "";
 }
 
 // ========================
-// 🟦 ACTIVITY LOG API
+// 📝 ACTIVITY LOG API
 // ========================
 
-// Tạo activity log mới
-export function createActivityLog({ user_id, action, related_id, related_type }) {
+/**
+ * Tạo activity log mới
+ * Được gọi từ Task Service hoặc các service khác
+ * @param {Object} payload - { user_id, user_name, user_avatar, action, related_id, related_name, team_id }
+ */
+export function createActivityLog(payload) {
   return apiRequest(`${API_URL}`, {
     method: "POST",
-    body: JSON.stringify({ user_id, action, related_id, related_type }),
+    body: JSON.stringify(payload),
   });
 }
 
-// Lấy activities theo user
+/**
+ * Lấy danh sách activities của một user cụ thể
+ * @param {string} userId - ID của user
+ * @param {Object} params - { limit, page }
+ */
 export function getUserActivities(userId, params = {}) {
   const queryString = buildQueryString(params);
   return apiRequest(`${API_URL}/user/${userId}${queryString}`);
 }
 
-// Lấy activities theo entity liên quan (task/project/team)
-export function getRelatedActivities(relatedType, relatedId, params = {}) {
+/**
+ * Lấy danh sách activities của một team
+ * @param {string} teamId - ID của team
+ * @param {Object} params - { limit, page }
+ */
+export function getTeamActivities(teamId, params = {}) {
   const queryString = buildQueryString(params);
-  return apiRequest(`${API_URL}/${relatedType}/${relatedId}${queryString}`);
-}
-
-// Xóa activity log
-export function deleteActivityLog(activityId) {
-  return apiRequest(`${API_URL}/${activityId}`, {
-    method: "DELETE",
-  });
+  return apiRequest(`${API_URL}/team/${teamId}${queryString}`);
 }
 
 // ========================
-// 🎯 HELPER FUNCTIONS
+// 🎯 CONVENIENCE FUNCTIONS
 // ========================
 
-// ✅ Lấy activities của user hiện tại
+/**
+ * Lấy activities của user hiện tại (đã đăng nhập)
+ * @param {Object} params - { limit, page }
+ */
 export function getMyActivities(params = {}) {
-  const userId = localStorage.getItem("userId");
+  const userId = getCurrentUserId();
   
   if (!userId) {
-    throw new Error("User ID not found. Please login again.");
+    throw new Error("Không tìm thấy thông tin người dùng. Vui lòng đăng nhập lại.");
   }
   
   return getUserActivities(userId, params);
 }
 
-// Lấy activities của task cụ thể
-export function getTaskActivities(taskId, params = {}) {
-  return getRelatedActivities("task", taskId, params);
-}
+// ========================
+// 📊 DEFAULT EXPORT
+// ========================
 
-// Lấy activities của project cụ thể
-export function getProjectActivities(projectId, params = {}) {
-  return getRelatedActivities("project", projectId, params);
-}
-
-// Lấy activities của team cụ thể
-export function getTeamActivities(teamId, params = {}) {
-  return getRelatedActivities("team", teamId, params);
-}
+export default {
+  createActivityLog,
+  getUserActivities,
+  getTeamActivities,
+  getMyActivities,
+};

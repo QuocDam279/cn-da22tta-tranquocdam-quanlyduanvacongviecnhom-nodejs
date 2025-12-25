@@ -21,6 +21,11 @@ const http = {
   activity: axios.create({
     baseURL: 'http://activity-service:5007/api/activity-logs', // 📡 Activity Log Service
     timeout: 5000
+  }),
+
+  notification: axios.create({
+    baseURL: 'http://notification-service:5005/api/notifications', // 📡 Dự kiến Notification Service
+    timeout: 5000
   })
 
 };

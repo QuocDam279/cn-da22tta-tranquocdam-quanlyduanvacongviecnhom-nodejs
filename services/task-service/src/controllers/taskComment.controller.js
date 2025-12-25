@@ -1,9 +1,9 @@
 import TaskComment from '../models/TaskComment.js';
-import Task from '../models/Task.js';
+import Task from '../models/Task.js'; // Task Model nằm chung trong Task Service? (Nếu tách service thì phải gọi HTTP)
 import http from '../utils/httpClient.js';
 
 /**
- * 💬 Tạo bình luận mới (Có kiểm tra thành viên)
+ * 💬 Tạo bình luận mới
  */
 export const createComment = async (req, res) => {
   try {
@@ -11,130 +11,141 @@ export const createComment = async (req, res) => {
     const { content } = req.body;
     const userId = req.user.id;
 
-    // 1️⃣ Kiểm tra task tồn tại
-    const task = await Task.findById(taskId);
-    if (!task) return res.status(404).json({ message: 'Không tìm thấy công việc' });
-
-    // 2️⃣ (MỚI) Kiểm tra quyền: User có thuộc Team của Project này không?
-    try {
-        // Lấy thông tin Project để biết Team ID
-        const { data: project } = await http.project.get(`/${task.project_id}`, {
-            headers: { Authorization: req.headers.authorization }
-        });
-
-        if (!project || !project.team_id) {
-            return res.status(404).json({ message: 'Không tìm thấy thông tin dự án' });
-        }
-
-        // Lấy thông tin Team để kiểm tra danh sách thành viên
-        const { data: teamData } = await http.team.get(`/${project.team_id}`, {
-            headers: { Authorization: req.headers.authorization }
-        });
-
-        // Kiểm tra ID user có trong danh sách members không
-        const members = teamData.members || [];
-        // Lưu ý: member.user_id có thể là object hoặc string tùy vào populate bên team service
-        const isMember = members.some(m => {
-            const mId = m.user_id._id || m.user_id;
-            return mId.toString() === userId;
-        });
-
-        if (!isMember) {
-            return res.status(403).json({ message: 'Bạn không phải thành viên của dự án này' });
-        }
-
-    } catch (err) {
-        console.error("❌ Lỗi check quyền comment:", err.message);
-        return res.status(500).json({ message: 'Lỗi xác thực quyền bình luận' });
+    // 1️⃣ Validate input
+    if (!content || !content.trim()) {
+      return res.status(400).json({ message: 'Nội dung bình luận không được để trống' });
     }
 
-    // 3️⃣ Tạo comment
+    // 2️⃣ Check Task tồn tại
+    const task = await Task.findById(taskId)
+      .select('project_id created_by assigned_to task_name');
+
+    if (!task) {
+      return res.status(404).json({ message: 'Công việc không tồn tại' });
+    }
+
+    // 3️⃣ Create Comment
     const comment = await TaskComment.create({
       task_id: taskId,
       user_id: userId,
       content
     });
 
-    // 4️⃣ (Tùy chọn) Populate thông tin user ngay để trả về frontend hiển thị luôn
-    // Ở đây mình fake object user để frontend đỡ phải fetch lại
-    const commentWithUser = {
-        ...comment.toObject(),
-        user: { _id: userId, name: "Bạn" } // Frontend sẽ tự load lại hoặc dùng cache user hiện tại
+    // 4️⃣ Snapshot user (từ Gateway)
+    const userSnapshot = {
+      _id: userId,
+      name: req.user.name || req.user.email || 'Bạn',
+      avatar: req.user.avatar || null
     };
 
+    const result = {
+      ...comment.toObject(),
+      user: userSnapshot
+    };
+
+    // ✅ Response ngay
     res.status(201).json({
-      message: 'Thêm bình luận thành công',
-      comment: commentWithUser
+      message: 'Bình luận thành công',
+      comment: result
+    });
+
+    // ==================================================
+    // 🔔 NOTIFICATION: COMMENT (async)
+    // ==================================================
+    const notifyUserIds = new Set();
+
+    if (task.assigned_to) notifyUserIds.add(task.assigned_to.toString());
+    if (task.created_by) notifyUserIds.add(task.created_by.toString());
+
+    // Không gửi cho chính người comment
+    notifyUserIds.delete(userId);
+
+    notifyUserIds.forEach(targetUserId => {
+      http.notification.post('/', {
+        user_id: targetUserId,
+        reference_id: task._id,
+        reference_model: 'Task',
+        type: 'COMMENT',
+        message: `${userSnapshot.name} đã bình luận trong công việc "${task.task_name}"`,
+        should_send_mail: false
+      }, {
+        // 🔥 THÊM DÒNG NÀY - Forward token từ request gốc
+        headers: { Authorization: req.headers.authorization }
+      }).catch(console.warn);
     });
 
   } catch (error) {
     console.error('❌ Lỗi createComment:', error.message);
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Lỗi server', error: error.message });
+    }
   }
 };
 
 /**
- * 📋 Lấy tất cả bình luận theo task
+ * 📋 Lấy danh sách comment
  */
 export const getCommentsByTask = async (req, res) => {
   try {
     const { taskId } = req.params;
 
     const comments = await TaskComment.find({ task_id: taskId })
-      .sort({ created_at: 1 })
+      .sort({ created_at: 1 }) // Cũ nhất lên đầu (kiểu chat)
       .lean();
 
     if (comments.length === 0) return res.json([]);
 
-    // Gọi Auth Service để lấy user info (Batch request)
+    // 1. Lấy danh sách User ID cần fetch info
     const userIds = [...new Set(comments.map(c => c.user_id.toString()))];
-    
+
+    // 2. Gọi Auth Service (Bulk)
     let users = [];
-    if (userIds.length > 0) {
-      try {
-          const { data } = await http.auth.post('/users/info', { ids: userIds });
-          users = data;
-      } catch (e) {
-          console.warn("⚠️ Không lấy được thông tin user comment", e.message);
-      }
+    try {
+        const { data } = await http.auth.post('/users/info', 
+            { ids: userIds },
+            { headers: { Authorization: req.headers.authorization } } // Forward token
+        );
+        users = data;
+    } catch (e) {
+        console.warn('⚠️ Fetch users for comments failed:', e.message);
+        // Không return error, vẫn trả comment nhưng thiếu info user
     }
 
-    const result = comments.map(c => ({
-      ...c,
-      user: users.find(u => u._id === c.user_id.toString()) || null
-    }));
+    // 3. Map user info vào comment
+    const result = comments.map(c => {
+        const user = users.find(u => u._id === c.user_id.toString());
+        return {
+            ...c,
+            user: user || { _id: c.user_id, name: 'Người dùng ẩn' } // Fallback
+        };
+    });
 
     res.json(result);
   } catch (error) {
-    console.error('❌ Lỗi getCommentsByTask:', error.message);
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }
 };
 
 /**
- * 🗑️ Xóa bình luận
+ * 🗑️ Xóa comment
  */
 export const deleteComment = async (req, res) => {
   try {
-    const { id } = req.params; // commentId
+    const { id } = req.params;
     const userId = req.user.id;
 
     const comment = await TaskComment.findById(id);
     if (!comment) return res.status(404).json({ message: 'Không tìm thấy bình luận' });
 
-    const task = await Task.findById(comment.task_id);
-    
-    // Quyền xóa: (Người viết comment) HOẶC (Người tạo task)
-    // Nâng cao: Có thể check thêm (Leader Team) nếu muốn
-    const isAuthor = comment.user_id.toString() === userId;
-    const isTaskCreator = task && task.created_by.toString() === userId;
-
-    if (!isAuthor && !isTaskCreator) {
-      return res.status(403).json({ message: 'Bạn không có quyền xóa bình luận này' });
+    // Check quyền: Chỉ chủ comment mới được xóa
+    // (Bỏ qua check Task Creator để giảm query, trừ khi cần thiết)
+    if (comment.user_id.toString() !== userId) {
+        return res.status(403).json({ message: 'Không có quyền xóa' });
     }
 
     await comment.deleteOne();
-    res.json({ message: 'Xóa bình luận thành công', id }); // Trả về ID để frontend filter
+    res.json({ message: 'Đã xóa bình luận', id });
+
   } catch (error) {
     res.status(500).json({ message: 'Lỗi server', error: error.message });
   }

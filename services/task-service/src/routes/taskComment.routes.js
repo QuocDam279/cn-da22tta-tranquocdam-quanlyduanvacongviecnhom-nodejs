@@ -8,8 +8,6 @@ import {
 
 const router = express.Router();
 
-// Prefix: /api/comments (Giả sử bạn mount router này ở path đó)
-
 // 1. Lấy danh sách comment của 1 task
 // GET /api/comments/task/:taskId
 router.get('/task/:taskId', verifyToken, getCommentsByTask);

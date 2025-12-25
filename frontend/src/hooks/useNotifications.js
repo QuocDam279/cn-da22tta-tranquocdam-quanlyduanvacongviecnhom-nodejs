@@ -1,67 +1,135 @@
-import { useMemo } from "react";
-import { useMyTasks } from "./useTasks";
-import { useMyProjects } from "./useProjects"; // Giả định bạn đã có hook này
-import { differenceInCalendarDays, parseISO, isAfter, isBefore, addDays } from "date-fns";
+// =====================================================
+// 📁 src/hooks/useNotifications.js
+// =====================================================
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  getMyNotifications,
+  getNotificationById,
+  getUnreadCount,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  sendNotification
+} from '../services/notificationService';
+
+// ========================
+// 🔔 MAIN HOOK: Danh sách thông báo
+// ========================
 
 export const useNotifications = () => {
-  // 1. Lấy dữ liệu Task và Project của user
-  const { data: tasks = [], isLoading: loadingTasks } = useMyTasks();
-  const { data: projects = [], isLoading: loadingProjects } = useMyProjects();
+  const queryClient = useQueryClient();
 
-  // 2. Xử lý Logic lọc
-  const notifications = useMemo(() => {
-    const notis = [];
-    const today = new Date();
+  // 1. Lấy danh sách thông báo
+  const query = useQuery({
+    queryKey: ['notifications'],
+    queryFn: getMyNotifications,
+    refetchInterval: 30 * 1000, // Polling 30s
+    staleTime: 10 * 1000,
+  });
 
-    // --- XỬ LÝ TASK (3 ngày) ---
-    tasks.forEach((task) => {
-      if (!task.due_date || task.status === "Done") return; // Bỏ qua task đã xong hoặc không có hạn
+  // 2. Tính toán số lượng chưa đọc (Derived State)
+  const notifications = query.data || [];
+  const unreadCount = notifications.filter(n => !n.is_read).length;
 
-      const dueDate = new Date(task.due_date);
-      const diffDays = differenceInCalendarDays(dueDate, today);
+  // ========================
+  // 🟩 MUTATIONS
+  // ========================
 
-      // Logic: Quá hạn HOẶC (Sắp đến hạn <= 3 ngày và chưa qua ngày hôm nay quá xa)
-      // Ở đây ta lấy: Quá hạn (số âm) hoặc Sắp đến hạn (0, 1, 2, 3)
-      if (diffDays <= 3) {
-        notis.push({
-          id: task._id,
-          type: "task",
-          title: task.task_name,
-          date: dueDate,
-          diffDays: diffDays, // Để hiển thị "Hôm nay", "Ngày mai", "Quá hạn"
-          link: `/congviec/${task._id}`,
-          priority: task.priority,
-        });
-      }
-    });
+  // 3. Đánh dấu đã đọc
+  const markReadMutation = useMutation({
+    mutationFn: markAsRead,
+    onMutate: async (id) => {
+      // Cancel các refetch đang chạy để không ghi đè dữ liệu ta tự sửa
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      // Lưu lại dữ liệu cũ để rollback nếu lỗi
+      const previousNotifications = queryClient.getQueryData(['notifications']);
+      // Tự sửa cache: Tìm notification có ID đó và đổi is_read = true
+      queryClient.setQueryData(['notifications'], (old) => 
+        old?.map(n => n._id === id ? { ...n, is_read: true } : n)
+      );
+      return { previousNotifications };
+    },
+    onError: (err, id, context) => {
+      queryClient.setQueryData(['notifications'], context.previousNotifications);
+    },
+    // KHÔNG dùng invalidateQueries ở đây nữa để tránh refetch
+  });
 
-    // --- XỬ LÝ PROJECT (7 ngày) ---
-    projects.forEach((project) => {
-      if (!project.end_date || project.status === "Completed") return;
+  // ⭐ NEW: Đánh dấu tất cả đã đọc
+  const markAllReadMutation = useMutation({
+    mutationFn: markAllAsRead,
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['notifications'] });
+      const previousNotifications = queryClient.getQueryData(['notifications']);
+      queryClient.setQueryData(['notifications'], (old) => 
+        old?.map(n => ({ ...n, is_read: true }))
+      );
+      return { previousNotifications };
+    },
+    onError: (err, variables, context) => {
+      queryClient.setQueryData(['notifications'], context.previousNotifications);
+    },
+  });
 
-      const endDate = new Date(project.end_date);
-      const diffDays = differenceInCalendarDays(endDate, today);
+  // 4. Xóa thông báo
+  const deleteMutation = useMutation({
+    mutationFn: deleteNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['notifications']);
+      queryClient.invalidateQueries(['unreadCount']);
+    },
+  });
 
-      if (diffDays <= 7) {
-        notis.push({
-          id: project._id,
-          type: "project",
-          title: project.project_name,
-          date: endDate,
-          diffDays: diffDays,
-          link: `/duan/${project._id}`,
-          priority: "High", // Project sắp hết hạn luôn quan trọng
-        });
-      }
-    });
-
-    // 3. Sắp xếp: Cái nào gấp hơn (diffDays nhỏ hơn) lên đầu
-    return notis.sort((a, b) => a.diffDays - b.diffDays);
-  }, [tasks, projects]);
+  // ⭐ NEW: Tạo thông báo (Manual)
+  const createMutation = useMutation({
+    mutationFn: sendNotification,
+    onSuccess: () => {
+      queryClient.invalidateQueries(['notifications']);
+    },
+  });
 
   return {
     notifications,
-    count: notifications.length,
-    isLoading: loadingTasks || loadingProjects,
+    unreadCount, // ⭐ Rename từ count
+    isLoading: query.isLoading,
+    isError: query.isError,
+    error: query.error,
+    
+    // Actions
+    markAsRead: markReadMutation.mutate,
+    markAllAsRead: markAllReadMutation.mutate, // ⭐ NEW
+    deleteNoti: deleteMutation.mutate,
+    createNotification: createMutation.mutate, // ⭐ NEW
+    
+    // Mutation states (nếu cần loading indicators)
+    isMarkingRead: markReadMutation.isPending,
+    isDeleting: deleteMutation.isPending,
   };
+};
+
+// ========================
+// ⭐ NEW HOOK: Chi tiết thông báo
+// ========================
+
+export const useNotificationDetail = (id) => {
+  return useQuery({
+    queryKey: ['notification', id],
+    queryFn: () => getNotificationById(id),
+    enabled: !!id, // Chỉ fetch khi có ID
+    staleTime: 5 * 60 * 1000, // Cache 5 phút
+  });
+};
+
+// ========================
+// ⭐ NEW HOOK: Unread Counter (Lightweight)
+// ========================
+
+export const useUnreadCount = () => {
+  return useQuery({
+    queryKey: ['unreadCount'],
+    queryFn: getUnreadCount,
+    refetchInterval: 30 * 1000, // Polling 30s
+    select: (data) => data.unread_count, // Extract count từ response
+  });
 };

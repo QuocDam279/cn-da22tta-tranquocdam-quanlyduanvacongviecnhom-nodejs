@@ -45,20 +45,21 @@ const taskSchema = new mongoose.Schema({
     min: 0, 
     max: 100, 
     default: 0 
+  },
+  // 🔥 THÊM MỚI: team_id để ghi log theo nhóm
+  team_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Team',
+    required: false, // Sẽ tự động điền khi tạo task
+    index: true
   }
 }, { 
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-// ✅ Tự động cập nhật `updated_at` khi chỉnh sửa
-taskSchema.pre('save', function (next) {
-  this.updated_at = Date.now();
-  next();
-});
-
-// ✅ Index giúp tăng tốc truy vấn (theo project, người được giao, task cha)
+// ✅ Index giúp tăng tốc truy vấn
 taskSchema.index({ project_id: 1 });
 taskSchema.index({ assigned_to: 1 });
+taskSchema.index({ team_id: 1 }); // 🔥 Index mới cho team_id
 
 export default mongoose.models.Task || mongoose.model('Task', taskSchema);
-

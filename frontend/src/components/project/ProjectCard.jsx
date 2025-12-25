@@ -23,7 +23,9 @@ export default function ProjectCard({ project }) {
 
   // 🛠️ Helper: Kiểm tra task đã xong (Hỗ trợ nhiều từ khóa)
   const isCompleted = (status) => {
-    return ["completed", "Done", "Đã hoàn thành"].includes(status);
+    if (!status) return false;
+    const s = status.toLowerCase(); // Chuyển hết về chữ thường
+    return ["completed", "done", "đã hoàn thành", "hoàn thành"].includes(s);
   };
 
   // Tính toán số liệu

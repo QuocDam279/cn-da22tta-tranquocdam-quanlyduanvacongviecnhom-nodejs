@@ -16,6 +16,12 @@ export const useLogin = () => {
   return useMutation({
     mutationFn: login,
     onSuccess: async (data) => {
+      // 👇 [THÊM MỚI] Lưu thông tin user vào localStorage để dùng cho Comment
+      // Giả sử API trả về data có dạng: { user: {...}, token: "..." }
+      if (data?.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+      
       // ✅ Invalidate tất cả cache liên quan
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profile'] }),
@@ -30,13 +36,13 @@ export const useLogin = () => {
   });
 };
 
-// Đăng nhập Google - Chỉ redirect, không cần mutation
+// Đăng nhập Google - Chỉ redirect
 export const useGoogleLogin = () => {
   return {
     mutate: () => {
-      loginWithGoogle(); // Tự động redirect đến Google
+      loginWithGoogle(); 
     },
-    isLoading: false, // Không có loading state vì redirect ngay
+    isLoading: false, 
   };
 };
 
@@ -47,16 +53,21 @@ export const useGoogleCallback = () => {
 
   return useMutation({
     mutationFn: async () => {
-      const result = handleGoogleCallback();
+      const result = await handleGoogleCallback(); // Thêm await cho chắc chắn
       
-      if (!result.success) {
-        throw new Error(result.error || 'Google login failed');
+      if (!result || !result.success) { // Kiểm tra kỹ hơn
+        throw new Error(result?.error || 'Google login failed');
       }
       
       return result;
     },
     onSuccess: async (data) => {
-      // ✅ Invalidate tất cả cache sau khi Google login thành công
+      // 👇 [THÊM MỚI] Lưu thông tin user vào localStorage
+      if (data?.user) {
+        localStorage.setItem('user', JSON.stringify(data.user));
+      }
+
+      // ✅ Invalidate tất cả cache
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['profile'] }),
         queryClient.invalidateQueries({ queryKey: ['my-tasks'] }),
@@ -67,7 +78,6 @@ export const useGoogleCallback = () => {
       
       console.log("✅ All cache invalidated after Google login");
       
-      // Redirect đến trang đã lưu hoặc dashboard
       navigate(data.redirectPath || '/dashboard');
     },
     onError: (error) => {
@@ -85,11 +95,14 @@ export const useLogout = () => {
   return useMutation({
     mutationFn: logout,
     onSuccess: () => {
+      // 👇 [THÊM MỚI] Xóa user khỏi localStorage khi đăng xuất
+      localStorage.removeItem('user');
+      // Nếu có lưu token riêng thì xóa luôn: localStorage.removeItem('token');
+
       // ✅ Clear toàn bộ cache
       queryClient.clear();
       console.log("✅ Cache cleared after logout");
       
-      // Redirect về trang login
       navigate('/login');
     },
   });

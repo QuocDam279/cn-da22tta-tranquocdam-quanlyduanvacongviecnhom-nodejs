@@ -1,44 +1,40 @@
 import express from 'express';
 import { verifyToken } from '../middleware/auth.middleware.js';
+
+// Import Queries
 import {
-  createProject,
   getProjectsByTeam,
   getProjectById,
+  getMyProjects,
+  batchGetProjects
+} from '../controllers/project.query.js';
+
+// Import Commands
+import {
+  createProject,
   updateProject,
   deleteProject,
-  getMyProjects,
   recalcProjectProgress,
-  batchGetProjects,
   deleteProjectsByTeam
-} from '../controllers/project.controller.js';
+} from '../controllers/project.command.js';
 
 const router = express.Router();
 
-// 📦 Batch endpoint - internal
+// --- BATCH & LISTS ---
 router.get('/batch', batchGetProjects);
-
-// 🧱 Tạo dự án mới
-router.post('/', verifyToken, createProject);
-
-// 📋 Lấy tất cả dự án user tham gia
 router.get('/', verifyToken, getMyProjects);
-
-// 🗑️ Xóa tất cả projects thuộc team (gọi từ Team Service)
-router.delete('/cascade/team/:teamId', verifyToken, deleteProjectsByTeam);
-
-// 📂 Lấy dự án theo team
 router.get('/team/:teamId', verifyToken, getProjectsByTeam);
 
-// 🔍 Chi tiết dự án
-router.get('/:id', verifyToken, getProjectById);
+// --- CASCADE DELETE (Called by Team Service) ---
+router.delete('/cascade/team/:teamId', verifyToken, deleteProjectsByTeam);
 
-// ✏️ Cập nhật dự án
-router.put('/:id', verifyToken, updateProject);
-
-// 🗑️ Xóa dự án
-router.delete('/:id', verifyToken, deleteProject);
-
-// 🔄 Tính lại tiến độ
+// --- SPECIFIC UPDATES (Called by Task Service) ---
 router.post('/:id/recalc-progress', verifyToken, recalcProjectProgress);
+
+// --- CORE CRUD ---
+router.post('/', verifyToken, createProject);
+router.get('/:id', verifyToken, getProjectById);
+router.put('/:id', verifyToken, updateProject);
+router.delete('/:id', verifyToken, deleteProject);
 
 export default router;

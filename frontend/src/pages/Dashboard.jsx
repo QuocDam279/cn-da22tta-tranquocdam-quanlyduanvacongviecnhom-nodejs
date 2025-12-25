@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import Header from "../components/common/Header";
 import OverviewCards from "../components/dashboard/OverviewCards";
-import ActivityLog from "../components/activity/UserActivities";
 import Footer from "../components/common/Footer";
 import Calendar from "../components/dashboard/Calendar";
 import Status from "../components/dashboard/Status";
@@ -16,7 +15,6 @@ const TABS = [
   { key: "overview", label: "Tổng quan", icon: "📊" },
   { key: "calendar", label: "Lịch", icon: "📅" },
   { key: "tasks", label: "Công việc", icon: "✓" },
-  { key: "activities", label: "Hoạt động", icon: "⚡" },
 ];
 
 /* ================= DEADLINE LOGIC ================= */
@@ -40,7 +38,7 @@ const isUpcomingProject = (project, days = 7) => {
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("overview");
 
-  const { tasks, teams, projects, activities, loading } = useDashboardData();
+  const { tasks, teams, projects, loading } = useDashboardData();
 
   /* ===== Upcoming ===== */
   const upcomingTasks = useMemo(
@@ -143,13 +141,6 @@ export default function Dashboard() {
         return (
           <div className="p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-300">
             <Calendar tasks={tasks} />
-          </div>
-        );
-
-      case "activities":
-        return (
-          <div className="p-6 rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-300">
-            <ActivityLog activities={activities} loading={loading} />
           </div>
         );
 
