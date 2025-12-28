@@ -1,0 +1,198 @@
+version: '3.9'
+
+services:
+  # -----------------------------
+  # 1. MONGO DATABASE
+  # -----------------------------
+  mongo:
+    image: mongo:7
+    container_name: mongo_db
+    restart: always
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  # -----------------------------
+  # 2. AUTH SERVICE
+  # -----------------------------
+  auth-service:
+    build:
+      context: ./services/auth-service
+      dockerfile: Dockerfile
+    container_name: auth_service
+    restart: always
+    ports:
+      - "5001:5001"
+    env_file:
+      - ./services/auth-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/auth-service:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+
+  # -----------------------------
+  # 3. TEAM SERVICE
+  # -----------------------------
+  team-service:
+    build:
+      context: ./services/team-service
+      dockerfile: Dockerfile
+    container_name: team_service
+    restart: always
+    ports:
+      - "5002:5002"
+    env_file:
+      - ./services/team-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/team-service:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+
+  # -----------------------------
+  # 4. PROJECT SERVICE
+  # -----------------------------
+  project-service:
+    build:
+      context: ./services/project-service
+      dockerfile: Dockerfile
+    container_name: project_service
+    restart: always
+    ports:
+      - "5003:5003"
+    env_file:
+      - ./services/project-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/project-service:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+
+  # -----------------------------
+  # 5. TASK SERVICE
+  # -----------------------------
+  task-service:
+    build:
+      context: ./services/task-service
+      dockerfile: Dockerfile
+    container_name: task_service
+    restart: always
+    ports:
+      - "5004:5004"
+    env_file:
+      - ./services/task-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/task-service:/usr/src/app
+      - /usr/src/app/node_modules
+      - ./uploads/tasks:/usr/src/app/uploads/tasks   # ← thêm dòng này
+    command: npm run dev
+
+  # -----------------------------
+  # 6. NOTIFICATION SERVICE
+  # -----------------------------
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: notification_service
+    restart: always
+    ports:
+      - "5005:5005"
+    env_file:
+      - ./services/notification-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/notification-service:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+
+  # -----------------------------
+  # 7. MAIL SERVICE
+  # -----------------------------
+  mail-service:
+    build:
+      context: ./services/mail-service
+      dockerfile: Dockerfile
+    container_name: mail_service
+    restart: always
+    ports:
+      - "5006:5006"
+    env_file:
+      - ./services/mail-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/mail-service:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+  
+  # -----------------------------
+  # 8. ACTIVITY SERVICE
+  # -----------------------------
+  activity-service:
+    build:
+      context: ./services/activity-service
+      dockerfile: Dockerfile
+    container_name: activity_service
+    restart: always
+    ports:
+      - "5007:5007"
+    env_file:
+      - ./services/activity-service/.env
+    depends_on:
+      - mongo
+    volumes:
+      - ./services/activity-service:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+
+  # -----------------------------
+  # 9. API GATEWAY
+  # -----------------------------
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: api_gateway
+    restart: always
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./services/api-gateway/.env
+    depends_on:
+      - auth-service
+      - team-service
+    volumes:
+      - ./services/api-gateway:/usr/src/app
+      - /usr/src/app/node_modules
+    command: npm run dev
+
+  # -----------------------------
+  # 10. FRONTEND (React + Vite + Tailwind)
+  # -----------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev
+# -----------------------------
+# 11. VOLUMES DÙNG CHUNG
+# -----------------------------
+volumes:
+  mongo_data:
+  auth_uploads:
