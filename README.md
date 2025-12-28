@@ -84,3 +84,17 @@ Dự án được cấu hình sẵn với **Docker Compose** để chạy toàn 
 ```bash
 git clone [https://github.com/your-username/project-name.git](https://github.com/your-username/project-name.git)
 cd project-name
+
+👤 Thông tin tác giả
+
+Họ và tên: Trần Quốc Đạm
+
+MSSV: 110122045
+
+Lớp: DA22TTA
+
+Khoa: Công nghệ Thông tin
+
+Email: tranquocdam2792004@gmail.com
+
+Số điện thoại: 0362922457
