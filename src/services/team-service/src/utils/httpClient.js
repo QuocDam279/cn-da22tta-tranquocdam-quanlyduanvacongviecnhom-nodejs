@@ -2,21 +2,25 @@ import axios from 'axios';
 
 const http = {
   auth: axios.create({
-    baseURL: 'http://auth-service:5001/api/auth', // 📡 Auth Service
+    baseURL: 'http://auth-service:5001/api/auth',
     timeout: 5000
   }),
 
   project: axios.create({
-    baseURL: 'http://project-service:5003/api/projects', // 📡 Project Service
+    baseURL: 'http://project-service:5003/api/projects',
     timeout: 5000
   }),
 
   notification: axios.create({
-    baseURL: 'http://notification-service:5005/api/notifications', // 📡 Notification Service
+    baseURL: 'http://notification-service:5005/api/notifications',
+    timeout: 5000
+  }),
+
+  // ✅ THÊM TASK SERVICE
+  task: axios.create({
+    baseURL: 'http://task-service:5004/api/tasks',
     timeout: 5000
   })
-
-  // Đã xóa Activity Service
 };
 
 // Middleware log

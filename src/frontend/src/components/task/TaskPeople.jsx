@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { User, ChevronDown } from "lucide-react";
+import { User, ChevronDown, UserX, AlertCircle } from "lucide-react";
 import UserAvatar from "../common/UserAvatar";
 
 export default function TaskPeople({
@@ -14,43 +14,40 @@ export default function TaskPeople({
   const wrapperRef = useRef(null);
   const buttonRef = useRef(null);
 
-  // 1. Xử lý logic hiển thị NGƯỜI ĐƯỢC GIAO (assigned_to)
+  // 1. Xử lý NGƯỜI ĐƯỢC GIAO (assigned_to) - AN TOÀN với null
   const assignedUser = useMemo(() => {
     const assignee = task.assigned_to;
     if (!assignee) return null;
-    // Nếu là object đầy đủ -> dùng luôn
+    
     if (typeof assignee === 'object' && assignee._id) return assignee;
-    // Nếu là ID string -> tìm trong danh sách members
+    
     if (typeof assignee === 'string') {
-        const foundMember = members.find(m => m.user?._id === assignee);
-        return foundMember ? foundMember.user : null;
+      const foundMember = members.find(m => m.user?._id === assignee);
+      return foundMember ? foundMember.user : null;
     }
     return null;
   }, [task.assigned_to, members]);
 
-  // 2. 🔥 THÊM: Xử lý logic hiển thị NGƯỜI TẠO (created_by)
+  // 2. Xử lý NGƯỜI TẠO (created_by)
   const creatorUser = useMemo(() => {
     const creator = task.created_by;
     if (!creator) return null;
     
-    // Nếu là object đầy đủ -> dùng luôn
     if (typeof creator === 'object' && creator._id) return creator;
     
-    // Nếu là ID string -> tìm trong danh sách members để lấy thông tin ảnh/tên
     if (typeof creator === 'string') {
-        const foundMember = members.find(m => m.user?._id === creator);
-        return foundMember ? foundMember.user : null;
+      const foundMember = members.find(m => m.user?._id === creator);
+      return foundMember ? foundMember.user : null;
     }
     return null;
   }, [task.created_by, members]);
 
-  // ... (Giữ nguyên các useEffect tính toán vị trí dropdown) ...
   useEffect(() => {
     if (open && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       const spaceBelow = window.innerHeight - rect.bottom;
       const spaceAbove = rect.top;
-      const dropdownHeight = 240; 
+      const dropdownHeight = 240;
       if (spaceBelow < dropdownHeight && spaceAbove > dropdownHeight) {
         setDropdownPosition("above");
       } else {
@@ -75,41 +72,46 @@ export default function TaskPeople({
         Người liên quan
       </h4>
 
-      {/* --- NGƯỜI TẠO (Đã sửa dùng creatorUser) --- */}
+      {/* --- NGƯỜI TẠO --- */}
       <div className="flex items-center gap-3 p-3 border rounded-xl bg-white">
-        {/* ✅ Dùng creatorUser thay vì task.created_by */}
         <UserAvatar 
           user={creatorUser} 
           className="w-9 h-9 rounded-full ring-1 ring-gray-200" 
         />
-        
         <div className="flex-1">
-          {/* ✅ Dùng creatorUser */}
           <p className="text-sm font-medium">
-             {creatorUser?.full_name || "Không rõ"}
+            {creatorUser?.full_name || "Không rõ"}
           </p>
           <p className="text-xs text-gray-500">Người tạo</p>
         </div>
         <User size={16} className="text-gray-400" />
       </div>
 
-      {/* --- NGƯỜI THỰC HIỆN (Giữ nguyên phần đã sửa trước đó) --- */}
+      {/* --- NGƯỜI THỰC HIỆN --- */}
       <div ref={wrapperRef} className="relative z-50">
         <button
           ref={buttonRef}
           type="button"
           disabled={!canChangeAssignee || isUpdating}
           onClick={() => setOpen((v) => !v)}
-          className={`w-full flex items-center gap-3 p-3 border rounded-xl bg-white text-left transition-colors
+          className={`w-full flex items-center gap-3 p-3 border rounded-xl text-left transition-colors
+            ${!assignedUser ? "bg-amber-50 border-amber-200" : "bg-white"}
             ${canChangeAssignee ? "hover:border-gray-400" : "opacity-80 cursor-default"}`}
         >
-          <UserAvatar 
-            user={assignedUser} 
-            className="w-9 h-9 rounded-full ring-1 ring-emerald-300"
-          />
+          {/* 🔥 SỬA: Hiển thị icon khác khi chưa giao */}
+          {assignedUser ? (
+            <UserAvatar 
+              user={assignedUser} 
+              className="w-9 h-9 rounded-full ring-1 ring-emerald-300"
+            />
+          ) : (
+            <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center ring-1 ring-amber-300">
+              <UserX size={18} className="text-amber-600" />
+            </div>
+          )}
 
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">
+            <p className={`text-sm font-medium truncate ${!assignedUser ? 'text-amber-700' : ''}`}>
               {assignedUser?.full_name || "Chưa giao"}
             </p>
             <p className="text-xs text-gray-500 truncate">
@@ -129,12 +131,34 @@ export default function TaskPeople({
           )}
         </button>
 
-        {/* Dropdown panel giữ nguyên */}
+        {/* 🔥 THÊM: Helper text khi chưa giao */}
+        {!assignedUser && (
+          <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 px-3 py-2 rounded-lg">
+            <AlertCircle size={12} />
+            <span>Công việc chưa có người thực hiện</span>
+          </div>
+        )}
+
+        {/* Dropdown */}
         {open && canChangeAssignee && !isUpdating && (
           <div
             className={`absolute w-full bg-white border rounded-xl shadow-xl max-h-60 overflow-y-auto z-50
               ${dropdownPosition === "above" ? "bottom-full mb-2" : "top-full mt-2"}`}
           >
+            {/* 🔥 THÊM: Option "Gỡ giao" nếu đang có người được giao */}
+            {assignedUser && (
+              <button
+                onClick={() => {
+                  setOpen(false);
+                  onUpdateAssignee(null); // ✅ Gửi null để unassign
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 text-sm hover:bg-red-50 transition-colors border-b text-red-600 font-medium"
+              >
+                <UserX size={16} />
+                <span>Gỡ giao công việc</span>
+              </button>
+            )}
+
             {members.map((m) => (
               <button
                 key={m.user._id}

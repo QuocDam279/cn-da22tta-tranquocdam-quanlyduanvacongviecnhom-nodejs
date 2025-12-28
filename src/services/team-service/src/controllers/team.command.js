@@ -1,6 +1,7 @@
 import Team from '../models/Team.js';
 import TeamMember from '../models/TeamMember.js';
 import http from '../utils/httpClient.js';
+import { unassignUserTasksInTeam } from '../services/team.helper.js';
 
 // --- CREATE ---
 export const createTeam = async (req, res) => {
@@ -93,31 +94,63 @@ export const addMembers = async (req, res) => {
 export const removeMember = async (req, res) => {
   try {
     const { id: team_id, uid: user_id } = req.params;
+    const authHeader = req.headers.authorization;
+    
     const team = await Team.findById(team_id);
     if (!team) return res.status(404).json({ message: 'Team not found' });
-    if (team.created_by.toString() !== req.user.id) return res.status(403).json({ message: 'Only Leader can remove members' });
+    if (team.created_by.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Only Leader can remove members' });
+    }
 
+    // ✅ XÓA MEMBER
     await TeamMember.findOneAndDelete({ team_id, user_id });
 
     res.json({ message: 'Member removed' });
 
-    // Async Notify (Giữ lại để user biết mình bị xóa)
-    http.notification.post('/', {
-      user_id, reference_id: team_id, reference_model: 'Team', type: 'WARNING',
-      message: `Bạn đã bị xóa khỏi nhóm "${team.team_name}"`, should_send_mail: true
-    }, { headers: { Authorization: req.headers.authorization } }).catch(() => {});
+    // =================================================================
+    // 🔥 THÊM: UNASSIGN TASKS CỦA USER TRONG TEAM NÀY
+    // =================================================================
+    unassignUserTasksInTeam(user_id, team_id, authHeader).catch(err => {
+      console.error('⚠️ Lỗi unassign tasks:', err.message);
+    });
 
-  } catch (error) { res.status(500).json({ message: 'Server Error' }); }
+    // Async Notify
+    http.notification.post('/', {
+      user_id, 
+      reference_id: team_id, 
+      reference_model: 'Team', 
+      type: 'WARNING',
+      message: `Bạn đã bị xóa khỏi nhóm "${team.team_name}"`, 
+      should_send_mail: true
+    }, { headers: { Authorization: authHeader } }).catch(() => {});
+
+  } catch (error) { 
+    res.status(500).json({ message: 'Server Error' }); 
+  }
 };
 
 export const leaveTeam = async (req, res) => {
   try {
     const { id: team_id } = req.params;
-    const deleted = await TeamMember.findOneAndDelete({ team_id, user_id: req.user.id });
+    const user_id = req.user.id;
+    const authHeader = req.headers.authorization;
+    
+    const deleted = await TeamMember.findOneAndDelete({ team_id, user_id });
     
     if (!deleted) return res.status(404).json({ message: "Not a member" });
+
     res.json({ message: "Left team successfully" });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+
+    // =================================================================
+    // 🔥 THÊM: UNASSIGN TASKS CỦA USER TRONG TEAM NÀY
+    // =================================================================
+    unassignUserTasksInTeam(user_id, team_id, authHeader).catch(err => {
+      console.error('⚠️ Lỗi unassign tasks:', err.message);
+    });
+
+  } catch (e) { 
+    res.status(500).json({ message: e.message }); 
+  }
 };
 
 // --- UPDATE & DELETE ---

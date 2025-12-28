@@ -23,12 +23,11 @@ class ActivityLogger {
         related_id: related_id || null,
         related_type: 'task',
         related_name: related_name,
-        team_id: team_id // 🔥 Quan trọng: Để trưởng nhóm lọc log
+        team_id: team_id
       }, {
         headers: token ? { Authorization: token } : {}
       });
     } catch (error) {
-      // Chỉ warn nhẹ, không làm crash luồng chính
       console.warn('⚠️ ActivityLogger Error:', error.response?.status || error.message);
     }
   }
@@ -79,9 +78,7 @@ class ActivityLogger {
     });
   }
 
-  // Dùng cho update chung (như đổi tên, mô tả)
   static async logTaskGeneralUpdate(user, task, changes, teamId, token) {
-    // Chỉ log nếu thay đổi tên hoặc mô tả, bỏ qua priority/date ở đây nếu lỡ truyền vào
     const keys = Object.keys(changes).filter(k => ['task_name', 'description'].includes(k));
     if (keys.length === 0) return;
 
@@ -103,6 +100,18 @@ class ActivityLogger {
       related_name: taskName,
       team_id: teamId,
       token
+    });
+  }
+
+  // ✅ SỬA LẠI: Dùng structure giống các method khác
+  static async logBulkUnassign(actor, unassignedUserId, teamId, count, authHeader) {
+    await this.log({
+      user: actor,
+      action: `đã gỡ giao ${count} công việc do thành viên rời nhóm`,
+      related_id: null, // Không có task cụ thể
+      related_name: `Bulk unassign (${count} tasks)`,
+      team_id: teamId,
+      token: authHeader
     });
   }
 }

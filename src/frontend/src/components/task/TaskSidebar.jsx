@@ -15,7 +15,6 @@ import {
   useUpdateTaskStartDate,
 } from "../../hooks/useTasks";
 
-// Hàm so sánh ID an toàn
 const areIdsEqual = (id1, id2) => {
   if (!id1 || !id2) return false;
   const str1 = typeof id1 === "object" ? id1.toString() : id1;
@@ -23,7 +22,6 @@ const areIdsEqual = (id1, id2) => {
   return str1 === str2;
 };
 
-// Định nghĩa mapping trạng thái
 const STATUS_MAP = {
   VN: {
     "To Do": "Chưa thực hiện",
@@ -44,10 +42,8 @@ export default function TaskSidebar({
   members = [],
   project,
 }) {
-  // 🔥 STATE LẠC QUAN: Dùng state này để hiển thị UI ngay lập tức
   const [localTask, setLocalTask] = useState(task);
 
-  // Sync state nội bộ khi task từ parent thay đổi (VD: khi người khác update hoặc đổi task khác)
   useEffect(() => {
     setLocalTask(task);
   }, [task]);
@@ -65,15 +61,17 @@ export default function TaskSidebar({
   );
   const isTeamLeader = currentMemberInfo?.role?.toLowerCase() === "leader";
   const isProjectCreator = areIdsEqual(project?.created_by?._id || project?.created_by, currentUser?._id);
-  const isAssignedUser = areIdsEqual(task.assigned_to?._id || task.assigned_to, currentUser?._id);
   
-  // ✅ Quyền sửa Assignee: Leader hoặc Project Creator
+  // 🔥 SỬA: Kiểm tra assigned_to an toàn (có thể null)
+  const isAssignedUser = localTask.assigned_to 
+    ? areIdsEqual(localTask.assigned_to._id || localTask.assigned_to, currentUser?._id)
+    : false;
+  
   const canChangeAssignee = isTeamLeader || isProjectCreator;
   
-  // ✅ Quyền sửa Status & Progress: Leader hoặc người được giao task
-  const canEditStatusProgress = isTeamLeader || isAssignedUser;
+  // 🔥 SỬA: Nếu task chưa giao (assigned_to = null), chỉ Leader mới sửa được
+  const canEditStatusProgress = isTeamLeader || (localTask.assigned_to && isAssignedUser);
   
-  // ✅ Quyền sửa Priority & Dates: CHỈ Leader
   const canEditPriorityDates = isTeamLeader;
 
   const isUpdating =
@@ -84,7 +82,6 @@ export default function TaskSidebar({
     updateStartDateMutation.isPending ||
     updateAssigneeMutation.isPending;
 
-  // Generic Handler
   const handleUpdate = async (mutation, payload, successMsg) => {
     try {
       const res = await mutation.mutateAsync(payload);
@@ -94,65 +91,44 @@ export default function TaskSidebar({
     } catch (err) {
       console.error(err);
       toast.error(err.message || "Cập nhật thất bại");
-      // Nếu lỗi, revert UI về trạng thái gốc từ props
       setLocalTask(task);
     }
   };
 
-  // ✅ 1. Cập nhật Status -> Cập nhật Local Task NGAY LẬP TỨC
   const updateStatus = (valVN) => {
-      const newStatus = STATUS_MAP.EN[valVN];
-      const oldStatus = localTask.status;
-      let newProgress = localTask.progress;
+    const newStatus = STATUS_MAP.EN[valVN];
+    const oldStatus = localTask.status;
+    let newProgress = localTask.progress;
 
-      console.log("👉 [Sidebar] 1. User selected Status:", newStatus);
-      console.log("👉 [Sidebar] 2. Current Progress:", newProgress);
-
-      if (newStatus === "Done") {
-        newProgress = 100;
-        console.log("👉 [Sidebar] 3. Auto-set Progress to 100");
-      } else if (newStatus === "To Do") {
-        newProgress = 0;
-        console.log("👉 [Sidebar] 3. Auto-set Progress to 0");
-      } else if (newStatus === "In Progress") {
-        // ✅ Logic: Chuyển sang "Đang thực hiện"
-        if (oldStatus === "Done") {
-          newProgress = 99; // Từ Done → In Progress = 99%
-          console.log("👉 [Sidebar] 3. Auto-set Progress to 99 (from Done)");
-        } else if (oldStatus === "To Do") {
-          newProgress = 1;  // Từ To Do → In Progress = 1%
-          console.log("👉 [Sidebar] 3. Auto-set Progress to 1 (from To Do)");
-        }
-        // Nếu đã đang ở In Progress rồi thì giữ nguyên progress hiện tại
+    if (newStatus === "Done") {
+      newProgress = 100;
+    } else if (newStatus === "To Do") {
+      newProgress = 0;
+    } else if (newStatus === "In Progress") {
+      if (oldStatus === "Done") {
+        newProgress = 99;
+      } else if (oldStatus === "To Do") {
+        newProgress = 1;
       }
+    }
 
-      // Kiểm tra xem state có thực sự thay đổi không
-      setLocalTask(prev => {
-        console.log("👉 [Sidebar] 4. Updating Local State to:", { ...prev, status: newStatus, progress: newProgress });
-        return { ...prev, status: newStatus, progress: newProgress };
-      });
+    setLocalTask(prev => ({ ...prev, status: newStatus, progress: newProgress }));
+    handleUpdate(
+      updateStatusMutation, 
+      { taskId: task._id, status: newStatus, progress: newProgress }, 
+      "Đã cập nhật trạng thái"
+    );
+  };
 
-      handleUpdate(
-        updateStatusMutation, 
-        { taskId: task._id, status: newStatus, progress: newProgress }, 
-        "Đã cập nhật trạng thái"
-      );
-    };
-
-  // ✅ 2. Cập nhật Progress -> Cập nhật Local Task NGAY LẬP TỨC
   const updateProgress = (val) => {
     const num = Number(val);
     let newStatus = localTask.status;
 
-    // Logic đồng bộ
     if (num === 100) newStatus = "Done";
     else if (num === 0) newStatus = "To Do";
     else newStatus = "In Progress";
 
-    // 🔥 OPTIMISTIC UPDATE
     setLocalTask(prev => ({ ...prev, progress: num, status: newStatus }));
-
-    // Gọi API
     handleUpdate(
       updateProgressMutation, 
       { taskId: task._id, progress: num, status: newStatus }, 
@@ -160,13 +136,10 @@ export default function TaskSidebar({
     );
   };
 
-  // Các hàm khác giữ nguyên, có thể áp dụng setLocalTask tương tự nếu muốn mượt
   const updatePriority = (val) => {
     const priorityMap = { Thấp: "Low", "Trung bình": "Medium", Cao: "High" };
     const newPriority = priorityMap[val];
-    
-    setLocalTask(prev => ({ ...prev, priority: newPriority })); // UI Update
-    
+    setLocalTask(prev => ({ ...prev, priority: newPriority }));
     handleUpdate(updatePriorityMutation, { taskId: task._id, priority: newPriority }, "Đã cập nhật ưu tiên");
   };
 
@@ -181,15 +154,28 @@ export default function TaskSidebar({
   };
 
   const updateAssignee = (newUserId) => {
-    if (!newUserId || newUserId === task.assigned_to?._id) return;
-    // Với Assignee thì hơi phức tạp để update local ngay vì cần object user đầy đủ
-    // Nên ta để server trả về rồi update cũng được
-    handleUpdate(updateAssigneeMutation, { taskId: task._id, userId: newUserId }, "Đã chuyển giao công việc");
+    // 🔥 THÊM: Xử lý unassign (chuyển về null)
+    if (!newUserId) {
+      setLocalTask(prev => ({ ...prev, assigned_to: null }));
+      handleUpdate(
+        updateAssigneeMutation, 
+        { taskId: task._id, userId: null }, 
+        "Đã gỡ giao công việc"
+      );
+      return;
+    }
+    
+    // Kiểm tra không giao lại cho người đang được giao
+    if (newUserId === task.assigned_to?._id) return;
+    
+    handleUpdate(
+      updateAssigneeMutation, 
+      { taskId: task._id, userId: newUserId }, 
+      "Đã chuyển giao công việc"
+    );
   };
 
   const priorityMapReverse = { "Low": "Thấp", "Medium": "Trung bình", "High": "Cao" };
-
-  // Kiểm tra xem user có quyền xem/sửa gì không
   const hasAnyPermission = canEditStatusProgress || canEditPriorityDates || canChangeAssignee;
 
   return (
@@ -210,15 +196,12 @@ export default function TaskSidebar({
           </div>
         )}
 
-        {/* Status & Priority */}
         <div className="space-y-3">
-          {/* 🔥 Status: Leader hoặc người được giao task */}
           <StatusSelect
             value={STATUS_MAP.VN[localTask.status] || "Chưa thực hiện"}
             onChange={(e) => updateStatus(e.target.value)}
             disabled={!canEditStatusProgress || isUpdating}
           />
-          {/* 🔥 Priority: CHỈ Leader */}
           <PrioritySelect
             value={priorityMapReverse[localTask.priority] || "Trung bình"}
             onChange={(e) => updatePriority(e.target.value)}
@@ -226,9 +209,7 @@ export default function TaskSidebar({
           />
         </div>
 
-        {/* Progress Bar */}
         <div className="bg-gradient-to-br from-gray-50 to-blue-50/30 rounded-lg p-3 border border-gray-200">
-          {/* 🔥 Progress: Leader hoặc người được giao task */}
           <TaskProgressBar
             progress={localTask.progress}
             onChange={updateProgress}
@@ -236,9 +217,7 @@ export default function TaskSidebar({
           />
         </div>
 
-        {/* Date Picker */}
         <div className="pt-3 border-t border-gray-100">
-          {/* 🔥 Dates: CHỈ Leader */}
           <TaskDates
             task={localTask}
             onUpdateDate={updateDates}
@@ -249,10 +228,9 @@ export default function TaskSidebar({
           />
         </div>
 
-        {/* Assignee */}
         <div className="pt-3 border-t border-gray-100">
           <TaskPeople
-            task={task}
+            task={localTask} 
             members={members}
             onUpdateAssignee={updateAssignee}
             canChangeAssignee={canChangeAssignee} 

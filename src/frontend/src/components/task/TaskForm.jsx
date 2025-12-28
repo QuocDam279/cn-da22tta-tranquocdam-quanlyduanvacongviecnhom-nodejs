@@ -23,9 +23,9 @@ export default function TaskForm({
   const [taskName, setTaskName] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState("Medium");
-  const [assignedTo, setAssignedTo] = useState("");
+  const [assignedTo, setAssignedTo] = useState(""); // ✅ Để trống = không giao ngay
   const [startDate, setStartDate] = useState(defaultStart);
-  const [dueDate, setDueDate] = useState(""); // Để trống ban đầu
+  const [dueDate, setDueDate] = useState("");
   const [error, setError] = useState("");
 
   const priorities = {
@@ -37,7 +37,6 @@ export default function TaskForm({
   const createTaskMutation = useCreateTask();
   const isSubmitting = createTaskMutation.isPending;
 
-  // Helper format ngày hiển thị lỗi
   const formatDateVN = (dateStr) => {
     if (!dateStr) return "N/A";
     return new Date(dateStr).toLocaleDateString("vi-VN");
@@ -49,14 +48,15 @@ export default function TaskForm({
 
     // --- Validate Cơ bản ---
     if (!taskName.trim()) return setError("Vui lòng nhập tên công việc!");
-    if (!assignedTo) return setError("Vui lòng chọn người thực hiện!");
+    
+    // ✅ BỎ VALIDATION BẮT BUỘC ASSIGNEE
+    // if (!assignedTo) return setError("Vui lòng chọn người thực hiện!");
     
     // --- Validate Logic Ngày tháng ---
     if (startDate && dueDate && startDate > dueDate) {
       return setError("Ngày kết thúc không thể trước ngày bắt đầu!");
     }
 
-    // --- Validate Ràng buộc Dự án ---
     if (projectStartDate && startDate < projectStartDate) {
       return setError(`Ngày bắt đầu không được sớm hơn dự án (${formatDateVN(projectStartDate)})`);
     }
@@ -65,28 +65,25 @@ export default function TaskForm({
     }
 
     try {
-      // Gọi API tạo mới
-      await createTaskMutation.mutateAsync({
+      // ✅ Chuẩn bị payload: CHỈ GỬI assigned_to NẾU CÓ GIÁ TRỊ
+      const payload = {
         task_name: taskName,
         description,
         priority,
-        assigned_to: assignedTo,
         project_id: projectId,
         start_date: startDate || null,
         due_date: dueDate || null,
-      });
+      };
 
-      toast.success("Đã tạo công việc mới!");
-
-      // 🛑 QUAN TRỌNG: NGĂN CHẶN SPAM REQUEST
-      // Nếu component cha truyền hàm refetch vào onTaskCreated, việc gọi nó ở đây
-      // sẽ vô hiệu hóa Optimistic Update và gây ra lỗi 429 (Too Many Requests).
-      // Chỉ gọi nếu bạn chắc chắn nó không gọi API GET.
-      if (onTaskCreated && typeof onTaskCreated === 'function') {
-         // onTaskCreated(); // <-- Tạm thời comment dòng này để an toàn nhất
+      // 🔥 CHỈ THÊM assigned_to NẾU NGƯỜI DÙNG ĐÃ CHỌN
+      if (assignedTo) {
+        payload.assigned_to = assignedTo;
       }
 
-      onClose(); // Đóng form
+      await createTaskMutation.mutateAsync(payload);
+
+      toast.success("Đã tạo công việc mới!");
+      onClose();
     } catch (err) {
       console.error(err);
       setError(err?.response?.data?.message || err.message || "Tạo công việc thất bại!");
@@ -140,7 +137,6 @@ export default function TaskForm({
             )}
             
             <div className="grid grid-cols-2 gap-4">
-              {/* Ngày bắt đầu */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Bắt đầu</label>
                 <div className="relative">
@@ -156,7 +152,6 @@ export default function TaskForm({
                 </div>
               </div>
 
-              {/* Hạn chót */}
               <div>
                 <label className="block text-xs font-semibold text-gray-600 mb-1">Hạn chót</label>
                 <div className="relative">
@@ -195,23 +190,32 @@ export default function TaskForm({
               </div>
             </div>
 
-            {/* Assignee */}
+            {/* Assignee - ✅ THÊM HINT VÀ BỎ DẤU * */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Giao cho <span className="text-red-500">*</span>
+                Giao cho
+                <span className="text-gray-400 text-xs ml-1">(có thể giao sau)</span>
               </label>
               <select
                 value={assignedTo}
                 onChange={(e) => setAssignedTo(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
               >
-                <option value="">-- Chọn thành viên --</option>
+                <option value="">-- Chọn thành viên (hoặc bỏ qua) --</option>
                 {members.map((m) => (
                   <option key={m.user?._id} value={m.user?._id}>
                     {m.user?.full_name} ({m.user?.email})
                   </option>
                 ))}
               </select>
+              
+              {/* ✅ THÊM HELPER TEXT */}
+              {!assignedTo && (
+                <p className="text-xs text-gray-500 mt-1.5 flex items-center gap-1">
+                  <Info size={12} />
+                  Công việc chưa có người thực hiện, bạn có thể giao sau
+                </p>
+              )}
             </div>
           </div>
 
@@ -261,7 +265,6 @@ export default function TaskForm({
 
       </div>
       
-      {/* Styles inline cho tiện */}
       <style jsx>{`
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }

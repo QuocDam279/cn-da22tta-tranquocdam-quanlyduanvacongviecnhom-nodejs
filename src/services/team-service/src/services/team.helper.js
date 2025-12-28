@@ -40,3 +40,30 @@ export const populateMembersWithUsers = async (members, authHeader) => {
     return members;
   }
 };
+
+/**
+ * 🆕 Unassign tất cả Task của user trong các Project thuộc Team
+ * @param {String} userId - ID người dùng bị xóa/rời nhóm
+ * @param {String} teamId - ID của nhóm
+ * @param {String} authHeader - Authorization header
+ */
+export const unassignUserTasksInTeam = async (userId, teamId, authHeader) => {
+  if (!userId || !teamId) return;
+  
+  try {
+    // Gọi Task Service để unassign tất cả task của user trong team này
+    await http.task.patch(`/unassign-by-team`, 
+      { user_id: userId, team_id: teamId },
+      { 
+        headers: { 
+          Authorization: authHeader,
+          'x-api-key': process.env.INTERNAL_API_KEY 
+        } 
+      }
+    );
+    
+    console.log(`✅ Đã unassign tasks của user ${userId} trong team ${teamId}`);
+  } catch (err) {
+    console.error(`⚠️ Lỗi unassign tasks cho user ${userId}:`, err.message);
+  }
+};

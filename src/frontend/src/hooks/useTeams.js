@@ -113,11 +113,14 @@ export const useLeaveTeam = () => {
   return useMutation({
     mutationFn: leaveTeam,
     onSuccess: (data, teamId) => {
-      // Khi rời nhóm, nên xóa cache của team đó đi
       queryClient.removeQueries({ queryKey: ['teams', teamId] });
-      
       queryClient.invalidateQueries({ queryKey: ['my-teams'] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      
+      // 🔥 THÊM: Invalidate tasks để cập nhật assigned_to
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-stats'] });
     },
   });
 };
@@ -153,19 +156,21 @@ export const useRemoveMember = () => {
     onSuccess: (data, variables) => {
       const { teamId, userId } = variables;
 
-      // ✅ TỐI ƯU TUYỆT ĐỐI: Không gọi API reload lại
-      // Ta tự lọc bỏ thành viên đó ra khỏi cache
+      // Cập nhật cache members
       queryClient.setQueryData(['teams', teamId], (oldData) => {
         if (!oldData || !oldData.members) return oldData;
-        
         return {
           ...oldData,
           members: oldData.members.filter(m => m.user?._id !== userId)
         };
       });
 
-      // Chỉ update log, không làm phiền UI chính
+      // 🔥 THÊM: Invalidate tasks của user bị xóa
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['my-tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['task-stats'] });
       queryClient.invalidateQueries({ queryKey: ['activities'] });
+      
       toast.success("Đã xóa thành viên");
     },
     onError: (err) => {

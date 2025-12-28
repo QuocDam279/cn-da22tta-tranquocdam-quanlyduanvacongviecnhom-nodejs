@@ -16,33 +16,29 @@ export const createTask = async (req, res) => {
   try {
     const { project_id, task_name, assigned_to, ...details } = req.body;
     const authHeader = req.headers.authorization;
-
-    // 🔥 Lấy tên người dùng từ helper
     const userName = getUserNameFromRequest(req);
 
-    // 🔥 Lấy team_id từ Project để log
+    // 🔥 Lấy team_id từ Project
     const teamId = await getTeamIdByProject(project_id, authHeader);
     if (!teamId) return res.status(400).json({ message: 'Dự án không hợp lệ hoặc không thuộc nhóm nào' });
 
-    // Tạo Task
+    // ✅ Tạo Task (assigned_to có thể undefined)
     const task = await Task.create({ 
       project_id, 
       team_id: teamId,
       task_name, 
-      assigned_to, 
+      ...(assigned_to && { assigned_to }), // 🔥 Chỉ thêm assigned_to nếu có
       created_by: req.user.id, 
       ...details 
     });
 
     res.status(201).json({ message: 'Tạo công việc thành công', task });
 
-    // ✅ LOG: Tạo mới
+    // ✅ LOG
     ActivityLogger.logTaskCreated(req.user, task, teamId, authHeader);
     triggerRecalcProjectProgress(project_id, authHeader);
 
-    // ===================================================================
-    // 🔥 SỬA: THÊM should_send_mail để gửi email
-    // ===================================================================
+    // ✅ CHỈ GỬI THÔNG BÁO NẾU CÓ NGƯỜI ĐƯỢC GIAO + KHÁC NGƯỜI TẠO
     if (assigned_to && assigned_to !== req.user.id) {
        http.notification.post('/', {
          user_id: assigned_to, 
@@ -50,7 +46,7 @@ export const createTask = async (req, res) => {
          reference_model: 'Task',
          type: 'ASSIGN', 
          message: `${userName} đã giao việc "${task_name}" cho bạn`,
-         should_send_mail: true  // ✅ BẬT GỬI EMAIL
+         should_send_mail: true
        }, { headers: { Authorization: authHeader } }).catch(() => {});
     }
   } catch (error) {
@@ -307,5 +303,68 @@ export const deleteTasksByProject = async (req, res) => {
   } catch (e) {
     console.error(e);
     res.status(500).json({ message: 'Lỗi server khi xóa tasks theo project' });
+  }
+};
+
+// =================================================================
+// 🆕 13. Unassign Tasks khi User rời nhóm/bị xóa
+// =================================================================
+export const unassignTasksByTeam = async (req, res) => {
+  try {
+    const { user_id, team_id } = req.body;
+
+    console.log('📥 [Unassign] Request:', { user_id, team_id });
+
+    // ✅ Validation đơn giản
+    if (!user_id || !team_id) {
+      console.error('❌ [Unassign] Missing fields');
+      return res.status(400).json({ 
+        message: 'Missing required fields: user_id and team_id' 
+      });
+    }
+
+    console.log('🔍 [Unassign] Executing updateMany...');
+
+    // ✅ MONGOOSE TỰ ĐỘNG CAST - Không cần new ObjectId()
+    const result = await Task.updateMany(
+      { 
+        team_id: team_id,        // ✅ Đơn giản hơn
+        assigned_to: user_id     // ✅ Mongoose tự cast
+      },
+      { 
+        $unset: { assigned_to: "" }
+      }
+    );
+
+    console.log(`✅ [Unassign] Success: ${result.modifiedCount} tasks unassigned`);
+
+    res.json({ 
+      message: 'Tasks unassigned successfully', 
+      unassignedCount: result.modifiedCount 
+    });
+
+    // ✅ LOG
+    if (result.modifiedCount > 0) {
+      const authHeader = req.headers.authorization;
+      
+      ActivityLogger.logBulkUnassign(
+        req.user,
+        user_id,
+        team_id,
+        result.modifiedCount,
+        authHeader
+      ).catch(err => {
+        console.error('⚠️ Lỗi ghi log bulk unassign:', err.message);
+      });
+    }
+
+  } catch (error) {
+    console.error('⚠️ [Unassign] Error:', error);
+    console.error('⚠️ [Unassign] Stack:', error.stack);
+    
+    res.status(500).json({ 
+      message: 'Server Error', 
+      error: error.message 
+    });
   }
 };

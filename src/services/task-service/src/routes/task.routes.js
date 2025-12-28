@@ -1,5 +1,6 @@
 import express from 'express';
 import { verifyToken } from '../middleware/auth.middleware.js';
+import { internalApiKey } from '../middleware/internalApiKey.js';
 
 // Import Query Controllers (Read)
 import {
@@ -22,7 +23,8 @@ import {
   updateTaskProgress,
   updateTaskPriority,
   updateTaskAssignee,
-  updateTaskDueDate
+  updateTaskDueDate,
+  unassignTasksByTeam
 } from '../controllers/task.command.js';
 
 const router = express.Router();
@@ -42,6 +44,7 @@ router.get('/:id', verifyToken, getTaskById);
 
 // --- PROJECT CASCADING ---
 router.delete('/cascade/project/:projectId', verifyToken, deleteTasksByProject);
+router.patch('/unassign-by-team', verifyToken, internalApiKey, unassignTasksByTeam);
 
 // --- SPECIFIC UPDATES ---
 router.patch('/:id/status', verifyToken, updateTaskStatus);
