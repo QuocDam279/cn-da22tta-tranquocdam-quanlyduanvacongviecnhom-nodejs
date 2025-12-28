@@ -1,13 +1,6 @@
-# Hệ Thống Quản Lý Dự Án và Công Việc Nhóm Trực Tuyến (Online Project Management System)
+# Hệ Thống Quản Lý Dự Án và Công Việc Nhóm Trực Tuyến
 
 > Đồ án Chuyên ngành Công nghệ Thông tin - Năm học 2025-2026
-> [cite_start]**Sinh viên thực hiện:** Trần Quốc Đạm 
-
-![Architecture](https://img.shields.io/badge/Architecture-Microservices-blue)
-![Frontend](https://img.shields.io/badge/Frontend-ReactJS%20%7C%20Vite-61DAFB)
-![Backend](https://img.shields.io/badge/Backend-NodeJS%20%7C%20Express-339933)
-![Database](https://img.shields.io/badge/Database-MongoDB-47A248)
-![Deploy](https://img.shields.io/badge/Docker-Compose-2496ED)
 
 ## 📖 Giới thiệu
 
@@ -83,44 +76,17 @@ Dự án đã được đóng gói hoàn chỉnh với **Docker Compose**. Bạn
 ```bash
 git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
 cd your-repo-name
-Bước 2: Cấu hình biến môi trường Hệ thống yêu cầu file .env cho từng dịch vụ. Dưới đây là cấu hình mẫu cơ bản (tham khảo từ source code):
-
-Tại services/api-gateway/.env:
-
-Đoạn mã
-
-PORT=3000
-JWT_SECRET=quocdamchuyennganh2025
-AUTH_SERVICE_URL=http://auth-service:5001/api/auth
-TEAM_SERVICE_URL=http://team-service:5002/api/teams
-PROJECT_SERVICE_URL=http://project-service:5003/api/projects
-TASK_SERVICE_URL=http://task-service:5004/api/tasks
-NOTIFICATION_SERVICE_URL=http://notification-service:5005/api/notifications
-
-[Lưu ý: Các service backend khác cũng cần file .env tương tự với PORT tương ứng] 
-
-Tại frontend/.env:
-
-Đoạn mã
-
-VITE_API_URL=http://localhost:3000/api
-
-
-Bước 3: Khởi chạy với Docker Compose Tại thư mục gốc của dự án, chạy lệnh:
-
-Bash
-
+```
+**Bước 2: Cấu hình biến môi trường: Đưa các file .env vào từng services và thư mục frontend**
+**Bước 3: Khởi chạy với Docker Compose**
+```bash
+Tại thư mục gốc của dự án, chạy lệnh:
 docker-compose up -d --build
-Lệnh này sẽ tự động build các images và khởi chạy 10 containers (bao gồm Database, Backend services, Gateway và Frontend).
-+1
-
-Bước 4: Truy cập hệ thống
-
-Web App: http://localhost:5173
-
-API Endpoint: http://localhost:3000
-
-📂 Cấu trúc thư mục
+```
+**Bước 4: Truy cập hệ thống**
+http://localhost:5173
+**Cấu trúc thu mục**
+```bash
 project-root/
 ├── frontend/                 # ReactJS Source code [cite: 453]
 │   ├── src/
@@ -135,12 +101,10 @@ project-root/
 │   └── notification-service/
 ├── docker-compose.yml        # Orchestration Config [cite: 515]
 └── README.md
+```
 👨‍💻 Tác giả
 Trần Quốc Đạm
 
 MSSV: 110122045 - Lớp: DA22TTA 
 
 Khoa Công nghệ Thông tin - Trường Kỹ Thuật và Công Nghệ
-
-
-Dự án này là sản phẩm thuộc Đồ án chuyên ngành học kỳ I, năm học 2025-2026.
