@@ -7,10 +7,6 @@ import {
   getUserNameFromRequest 
 } from '../services/task.helper.js';
 
-// ============================================================
-// 🟡 WRITE OPERATIONS (Thay đổi dữ liệu)
-// ============================================================
-
 // 4. Create Task
 export const createTask = async (req, res) => {
   try {
