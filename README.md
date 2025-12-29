@@ -84,11 +84,12 @@ Dự án đã được đóng gói hoàn chỉnh với **Docker Compose**. Bạn
 
 **Bước 1: Clone dự án**
 ```bash
-git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
-cd your-repo-name
+git clone https://github.com/QuocDam279/cn-da22tta-tranquocdam-quanlyduanvacongviecnhom-nodejs.git
+cd cn-da22tta-tranquocdam-quanlyduanvacongviecnhom-nodejs
 ```
 **Bước 2: Cấu hình biến môi trường: Đưa các file .env vào từng services và thư mục frontend**
-**Bước 3: Khởi chạy với Docker Compose**
+
+**Bước 3: Đưa file docker-compose.yml vào thư mục dự án, khởi chạy với Docker Compose**
 ```bash
 Tại thư mục gốc của dự án, chạy lệnh:
 docker-compose up -d --build
@@ -113,8 +114,10 @@ project-root/
 ├── docker-compose.yml        # Orchestration Config [cite: 515]
 └── README.md
 ```
+### 👨‍💻 Giảng viên hướng dẫn
+ThS. Nguyễn Ngọc Đan Thanh
 
-## 👨‍💻 Tác giả
+### 👨‍💻 Tác giả
 - Họ và tên: Trần Quốc Đạm
 - MSSV: 110122045
 - Lớp: DA22TTA
