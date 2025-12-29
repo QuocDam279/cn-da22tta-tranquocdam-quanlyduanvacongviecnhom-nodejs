@@ -88,7 +88,8 @@ git clone https://github.com/QuocDam279/cn-da22tta-tranquocdam-quanlyduanvacongv
 cd cn-da22tta-tranquocdam-quanlyduanvacongviecnhom-nodejs
 ```
 **Bước 2: Cấu hình biến môi trường: Đưa các file .env vào từng services và thư mục frontend**
-**Bước 3: Khởi chạy với Docker Compose**
+
+**Bước 3: Đưa file docker-compose.yml vào thư mục dự án, khởi chạy với Docker Compose**
 ```bash
 Tại thư mục gốc của dự án, chạy lệnh:
 docker-compose up -d --build
