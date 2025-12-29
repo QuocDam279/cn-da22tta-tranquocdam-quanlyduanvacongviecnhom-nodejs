@@ -113,10 +113,10 @@ project-root/
 ├── docker-compose.yml        # Orchestration Config [cite: 515]
 └── README.md
 ```
-## 👨‍💻 Giảng viên hướng dẫn
-- Nguyễn Ngọc Đan Thanh
+### 👨‍💻 Giảng viên hướng dẫn
+ThS. Nguyễn Ngọc Đan Thanh
 
-## 👨‍💻 Tác giả
+### 👨‍💻 Tác giả
 - Họ và tên: Trần Quốc Đạm
 - MSSV: 110122045
 - Lớp: DA22TTA
