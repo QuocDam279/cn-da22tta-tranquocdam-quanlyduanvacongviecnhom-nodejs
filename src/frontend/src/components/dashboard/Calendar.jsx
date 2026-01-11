@@ -11,7 +11,10 @@ export default function Calendar({ tasks = [] }) {
   const today = new Date();
   const [currentMonth, setCurrentMonth] = useState(today.getMonth());
   const [currentYear, setCurrentYear] = useState(today.getFullYear());
-  const [selectedDay, setSelectedDay] = useState(null);
+  
+  // --- THAY ĐỔI Ở ĐÂY: Khởi tạo bằng ngày hiện tại thay vì null ---
+  const [selectedDay, setSelectedDay] = useState(today.getDate()); 
+  
   const navigate = useNavigate();
 
   const handlePrevMonth = () => {
@@ -21,6 +24,8 @@ export default function Calendar({ tasks = [] }) {
     } else {
       setCurrentMonth(currentMonth - 1);
     }
+    // Tùy chọn: Nếu muốn reset lựa chọn khi chuyển tháng thì bỏ comment dòng dưới
+    // setSelectedDay(null); 
   };
 
   const handleNextMonth = () => {
@@ -30,6 +35,8 @@ export default function Calendar({ tasks = [] }) {
     } else {
       setCurrentMonth(currentMonth + 1);
     }
+    // Tùy chọn: Nếu muốn reset lựa chọn khi chuyển tháng thì bỏ comment dòng dưới
+    // setSelectedDay(null);
   };
 
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
@@ -58,7 +65,14 @@ export default function Calendar({ tasks = [] }) {
 
   const getTasksForDay = (day) => {
     if (!day || !tasks) return [];
-    const currentDate = new Date(currentYear, currentMonth, day).toISOString().slice(0, 10);
+    // Lưu ý: new Date(year, month, day) có thể bị lệch múi giờ nếu không xử lý kỹ,
+    // nhưng với logic hiện tại của bạn để lấy chuỗi YYYY-MM-DD thì tạm ổn.
+    // Tốt hơn nên dùng thư viện như date-fns hoặc moment để so sánh ngày chính xác hơn.
+    const dateObj = new Date(currentYear, currentMonth, day);
+    // Điều chỉnh múi giờ để toISOString không bị lùi 1 ngày (do UTC)
+    const offset = dateObj.getTimezoneOffset() * 60000;
+    const currentDate = new Date(dateObj.getTime() - offset).toISOString().slice(0, 10);
+
     return tasks.filter(task => {
       const start = task.start_date?.slice(0, 10) || task.created_at?.slice(0, 10);
       const end = task.due_date?.slice(0, 10) || start;

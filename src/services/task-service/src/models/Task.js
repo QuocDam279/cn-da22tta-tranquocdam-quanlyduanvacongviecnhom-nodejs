@@ -47,20 +47,22 @@ const taskSchema = new mongoose.Schema({
     max: 100, 
     default: 0 
   },
-  // 🔥 THÊM MỚI: team_id để ghi log theo nhóm
   team_id: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Team',
-    required: false, // Sẽ tự động điền khi tạo task
+    required: false,
     index: true
   }
 }, { 
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 });
 
-// ✅ Index giúp tăng tốc truy vấn
+// ✅ Index tăng tốc truy vấn
 taskSchema.index({ project_id: 1 });
 taskSchema.index({ assigned_to: 1 });
-taskSchema.index({ team_id: 1 }); // 🔥 Index mới cho team_id
+taskSchema.index({ team_id: 1 });
+
+// ✅ Compound unique index: Tên task phải unique trong 1 project
+taskSchema.index({ project_id: 1, task_name: 1 }, { unique: true });
 
 export default mongoose.models.Task || mongoose.model('Task', taskSchema);

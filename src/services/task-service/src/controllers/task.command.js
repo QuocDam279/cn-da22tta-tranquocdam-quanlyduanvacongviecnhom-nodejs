@@ -4,37 +4,65 @@ import ActivityLogger from '../utils/activityLogger.js';
 import { 
   triggerRecalcProjectProgress, 
   getTeamIdByProject, 
-  getUserNameFromRequest 
+  getUserNameFromRequest,
+  validateTaskDueDate 
 } from '../services/task.helper.js';
 
-// 4. Create Task
+// =================================================================
+// 4. Create Task - CÓ VALIDATION
+// =================================================================
 export const createTask = async (req, res) => {
   try {
-    const { project_id, task_name, assigned_to, ...details } = req.body;
+    const { project_id, task_name, assigned_to, due_date, ...details } = req.body;
     const authHeader = req.headers.authorization;
     const userName = getUserNameFromRequest(req);
 
     // 🔥 Lấy team_id từ Project
     const teamId = await getTeamIdByProject(project_id, authHeader);
-    if (!teamId) return res.status(400).json({ message: 'Dự án không hợp lệ hoặc không thuộc nhóm nào' });
+    if (!teamId) {
+      return res.status(400).json({ 
+        message: 'Dự án không hợp lệ hoặc không thuộc nhóm nào' 
+      });
+    }
 
-    // ✅ Tạo Task (assigned_to có thể undefined)
+    // ✅ Kiểm tra tên task trùng trong project
+    const existingTask = await Task.findOne({
+      project_id,
+      task_name: task_name.trim()
+    });
+    
+    if (existingTask) {
+      return res.status(400).json({ 
+        message: 'Tên công việc đã tồn tại trong dự án này',
+        field: 'task_name'
+      });
+    }
+
+    // ✅ VALIDATE DUE DATE
+    if (due_date) {
+      const validation = await validateTaskDueDate(project_id, due_date, authHeader);
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.message });
+      }
+    }
+
+    // ✅ Tạo Task
     const task = await Task.create({ 
       project_id, 
       team_id: teamId,
-      task_name, 
-      ...(assigned_to && { assigned_to }), // 🔥 Chỉ thêm assigned_to nếu có
+      task_name: task_name.trim(), 
+      ...(assigned_to && { assigned_to }),
+      ...(due_date && { due_date }),
       created_by: req.user.id, 
       ...details 
     });
 
     res.status(201).json({ message: 'Tạo công việc thành công', task });
 
-    // ✅ LOG
+    // ✅ LOG & NOTIFICATIONS
     ActivityLogger.logTaskCreated(req.user, task, teamId, authHeader);
     triggerRecalcProjectProgress(project_id, authHeader);
 
-    // ✅ CHỈ GỬI THÔNG BÁO NẾU CÓ NGƯỜI ĐƯỢC GIAO + KHÁC NGƯỜI TẠO
     if (assigned_to && assigned_to !== req.user.id) {
        http.notification.post('/', {
          user_id: assigned_to, 
@@ -46,7 +74,18 @@ export const createTask = async (req, res) => {
        }, { headers: { Authorization: authHeader } }).catch(() => {});
     }
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server', error: error.message });
+    // ✅ Xử lý lỗi unique constraint từ MongoDB
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Tên công việc đã tồn tại trong dự án này',
+        field: 'task_name'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Lỗi server', 
+      error: error.message 
+    });
   }
 };
 
@@ -215,13 +254,38 @@ export const updateTaskPriority = async (req, res) => {
   } catch (e) { res.status(500).json({ message: 'Lỗi server' }); }
 };
 
-// 9. Update Due Date
+// =================================================================
+// 9. Update Due Date - CÓ VALIDATION
+// =================================================================
 export const updateTaskDueDate = async (req, res) => {
   try {
     const { due_date } = req.body;
-    const task = await Task.findByIdAndUpdate(req.params.id, { due_date }, { new: true });
+    const task = await Task.findById(req.params.id);
+    
+    if (!task) {
+      return res.status(404).json({ message: 'Không tìm thấy công việc' });
+    }
+
+    // ✅ VALIDATE DUE DATE
+    if (due_date) {
+      const validation = await validateTaskDueDate(
+        task.project_id, 
+        due_date, 
+        req.headers.authorization
+      );
+      
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.message });
+      }
+    }
+
+    task.due_date = due_date;
+    await task.save();
+
     res.json({ message: 'Cập nhật hạn chót thành công', task });
-  } catch (e) { res.status(500).json({ message: 'Lỗi server' }); }
+  } catch (e) { 
+    res.status(500).json({ message: 'Lỗi server', error: e.message }); 
+  }
 };
 
 // 10. Update General Info
@@ -229,19 +293,71 @@ export const updateTask = async (req, res) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+    
     const task = await Task.findById(id);
-    if (!task) return res.status(404).json({ message: 'Not found' });
+    if (!task) {
+      return res.status(404).json({ message: 'Không tìm thấy công việc' });
+    }
+
+    // ✅ Kiểm tra tên trùng nếu có thay đổi task_name
+    if (updates.task_name && updates.task_name.trim() !== task.task_name) {
+      const existingTask = await Task.findOne({
+        project_id: task.project_id,
+        task_name: updates.task_name.trim(),
+        _id: { $ne: id } // Loại trừ chính task đang sửa
+      });
+      
+      if (existingTask) {
+        return res.status(400).json({ 
+          message: 'Tên công việc đã tồn tại trong dự án này',
+          field: 'task_name'
+        });
+      }
+      
+      // Trim task_name trước khi update
+      updates.task_name = updates.task_name.trim();
+    }
+
+    // ✅ VALIDATE DUE DATE nếu có thay đổi
+    if (updates.due_date && updates.due_date !== task.due_date?.toISOString()) {
+      const validation = await validateTaskDueDate(
+        task.project_id, 
+        updates.due_date, 
+        req.headers.authorization
+      );
+      if (!validation.valid) {
+        return res.status(400).json({ message: validation.message });
+      }
+    }
 
     const teamId = await getTeamIdByProject(task.project_id, req.headers.authorization);
+    
     Object.assign(task, updates);
     await task.save();
 
     res.json({ message: 'Cập nhật thành công', task });
 
-    ActivityLogger.logTaskGeneralUpdate(req.user, task, updates, teamId, req.headers.authorization);
+    ActivityLogger.logTaskGeneralUpdate(
+      req.user, 
+      task, 
+      updates, 
+      teamId, 
+      req.headers.authorization
+    );
     triggerRecalcProjectProgress(task.project_id, req.headers.authorization);
   } catch (error) {
-    res.status(500).json({ message: 'Lỗi server' });
+    // ✅ Xử lý lỗi unique constraint
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Tên công việc đã tồn tại trong dự án này',
+        field: 'task_name'
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Lỗi server',
+      error: error.message 
+    });
   }
 };
 

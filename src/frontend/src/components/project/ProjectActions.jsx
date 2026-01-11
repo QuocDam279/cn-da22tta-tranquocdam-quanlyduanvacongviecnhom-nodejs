@@ -1,21 +1,19 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { MoreVertical, Edit, Trash2 } from "lucide-react";
+import { MoreVertical, Edit, Trash2, AlertCircle } from "lucide-react";
 import { useUpdateProject, useDeleteProject } from "../../hooks/useProjects";
 import ConfirmDialog from "../common/ConfirmDialog";
 
 export default function ProjectActions({ project, onUpdated }) {
   const navigate = useNavigate();
   
-  // ✅ Lấy user ID từ localStorage hoặc sessionStorage
   const userId = 
     localStorage.getItem("user_id") || 
     sessionStorage.getItem("user_id") ||
     localStorage.getItem("userId") ||
     sessionStorage.getItem("userId");
 
-  // ✅ Kiểm tra quyền: creator hoặc team leader
   const isCreator = 
     project?.created_by?._id === userId || 
     project?.created_by === userId;
@@ -30,6 +28,7 @@ export default function ProjectActions({ project, onUpdated }) {
   const [showPopup, setShowPopup] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState("");
+  const [conflictingTasks, setConflictingTasks] = useState([]);
 
   const [form, setForm] = useState({
     project_name: project?.project_name || "",
@@ -86,7 +85,6 @@ export default function ProjectActions({ project, onUpdated }) {
       setMenuOpen(false);
       setShowConfirm(false);
 
-      // ✅ Chuyển về trang nhóm (nơi dự án tạo ra)
       setTimeout(() => {
         const teamId = project.team?._id;
         if (teamId) {
@@ -110,7 +108,15 @@ export default function ProjectActions({ project, onUpdated }) {
       return;
     }
 
+    // Validate dates
+    if (form.start_date && form.end_date && form.start_date > form.end_date) {
+      setError("Ngày kết thúc phải sau ngày bắt đầu");
+      toast.error("Ngày kết thúc phải sau ngày bắt đầu", { duration: 2000 });
+      return;
+    }
+
     setError("");
+    setConflictingTasks([]);
     const loadingToast = toast.loading("Đang cập nhật dự án...");
 
     try {
@@ -128,11 +134,22 @@ export default function ProjectActions({ project, onUpdated }) {
       if (onUpdated) onUpdated(result.project || result);
       setShowPopup(false);
       setError("");
+      setConflictingTasks([]);
     } catch (err) {
       toast.dismiss(loadingToast);
-      const errorMsg = err.message || "Cập nhật dự án thất bại";
+      
+      // ✅ Xử lý lỗi validation từ backend
+      const errorData = err.response?.data;
+      const errorMsg = errorData?.message || err.message || "Cập nhật dự án thất bại";
+      
       setError(errorMsg);
-      toast.error(errorMsg, { duration: 2000 });
+      
+      // ✅ Nếu có danh sách tasks conflict
+      if (errorData?.conflictingTasks) {
+        setConflictingTasks(errorData.conflictingTasks);
+      }
+      
+      // ❌ KHÔNG hiển thị toast - chỉ hiển thị trong form
     }
   };
 
@@ -142,7 +159,6 @@ export default function ProjectActions({ project, onUpdated }) {
 
   return (
     <div className="relative" ref={containerRef}>
-      {/* Nút 3 chấm */}
       <button
         onClick={(e) => {
           e.stopPropagation();
@@ -155,7 +171,6 @@ export default function ProjectActions({ project, onUpdated }) {
         <MoreVertical size={20} className="text-gray-600" />
       </button>
 
-      {/* Dropdown menu */}
       {menuOpen && (
         <div className="absolute right-0 mt-2 w-44 bg-white border border-gray-200 rounded-xl shadow-xl z-[50] overflow-hidden">
           <button
@@ -188,109 +203,166 @@ export default function ProjectActions({ project, onUpdated }) {
         </div>
       )}
 
-      {/* Popup Sửa */}
       {showPopup && (
         <div
           ref={popupRef}
-          className="absolute right-0 mt-3 w-96 bg-white border border-gray-200 rounded-xl shadow-2xl p-6 z-[9999] animate-in fade-in zoom-in-95"
+          className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPopup(false);
+              setError("");
+              setConflictingTasks([]);
+            }
+          }}
         >
-          <h3 className="font-bold text-lg text-gray-800 mb-4">Chỉnh sửa dự án</h3>
-
-          {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-              {error}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Tên dự án <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
-                value={form.project_name}
-                onChange={(e) => setForm({ ...form, project_name: e.target.value })}
-                disabled={loading}
-                placeholder="Nhập tên dự án"
-              />
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-in zoom-in-95">
+            {/* Header - Fixed */}
+            <div className="px-6 pt-6 pb-4 border-b border-gray-200 flex-shrink-0">
+              <h3 className="font-bold text-lg text-gray-800">Chỉnh sửa dự án</h3>
             </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Mô tả
-              </label>
-              <textarea
-                rows={3}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none disabled:opacity-50"
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                disabled={loading}
-                placeholder="Nhập mô tả dự án"
-              />
-            </div>
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto px-6 py-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100">
+              {/* Error Display */}
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                    <div className="flex-1">
+                      <p className="text-red-600 text-sm font-medium mb-1">{error}</p>
+                      
+                      {conflictingTasks.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs text-red-700 font-semibold">
+                            Các công việc có hạn chót vượt quá thời hạn mới:
+                          </p>
+                          <ul className="space-y-1 ml-2">
+                            {conflictingTasks.map((task, idx) => (
+                              <li key={idx} className="text-xs text-red-700 flex items-start gap-2">
+                                <span className="text-red-400 mt-0.5">•</span>
+                                <span>
+                                  <strong>{task.task_name}</strong>
+                                  {task.due_date && (
+                                    <span className="text-red-600">
+                                      {" "}(hạn: {new Date(task.due_date).toLocaleDateString("vi-VN")})
+                                    </span>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                          <p className="text-xs text-red-700 mt-2 italic">
+                            💡 Vui lòng cập nhật hạn chót của các công việc này trước khi thay đổi thời hạn dự án.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Ngày bắt đầu
-                </label>
-                <input
-                  type="date"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
-                  value={form.start_date}
-                  onChange={(e) => setForm({ ...form, start_date: e.target.value })}
-                  disabled={loading}
-                />
+              {/* Form Fields */}
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Tên dự án <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
+                    value={form.project_name}
+                    onChange={(e) => setForm({ ...form, project_name: e.target.value })}
+                    disabled={loading}
+                    placeholder="Nhập tên dự án"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Mô tả
+                  </label>
+                  <textarea
+                    rows={3}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all resize-none disabled:opacity-50"
+                    value={form.description}
+                    onChange={(e) => setForm({ ...form, description: e.target.value })}
+                    disabled={loading}
+                    placeholder="Nhập mô tả dự án"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Ngày bắt đầu
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
+                      value={form.start_date}
+                      onChange={(e) => setForm({ ...form, start_date: e.target.value })}
+                      disabled={loading}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      Ngày kết thúc
+                    </label>
+                    <input
+                      type="date"
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
+                      value={form.end_date}
+                      onChange={(e) => {
+                        setForm({ ...form, end_date: e.target.value });
+                        if (error) {
+                          setError("");
+                          setConflictingTasks([]);
+                        }
+                      }}
+                      disabled={loading}
+                      min={form.start_date || undefined}
+                    />
+                  </div>
+                </div>
               </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Ngày kết thúc
-                </label>
-                <input
-                  type="date"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50"
-                  value={form.end_date}
-                  onChange={(e) => setForm({ ...form, end_date: e.target.value })}
-                  disabled={loading}
-                />
-              </div>
             </div>
 
-            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-              <button
-                onClick={() => {
-                  setShowPopup(false);
-                  setError("");
-                }}
-                className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors font-medium disabled:opacity-50"
-                disabled={loading}
-              >
-                Hủy
-              </button>
+            {/* Footer - Fixed */}
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex-shrink-0">
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowPopup(false);
+                    setError("");
+                    setConflictingTasks([]);
+                  }}
+                  className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-100 transition-colors font-medium disabled:opacity-50"
+                  disabled={loading}
+                >
+                  Hủy
+                </button>
 
-              <button
-                onClick={handleUpdate}
-                disabled={loading}
-                className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {loading ? (
-                  <>
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Đang lưu...
-                  </>
-                ) : (
-                  "Lưu thay đổi"
-                )}
-              </button>
+                <button
+                  onClick={handleUpdate}
+                  disabled={loading}
+                  className="px-6 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors font-medium disabled:bg-blue-400 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Đang lưu...
+                    </>
+                  ) : (
+                    "Lưu thay đổi"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Confirm Dialog - Xóa dự án */}
       {showConfirm && (
         <ConfirmDialog
           title="Xóa dự án"

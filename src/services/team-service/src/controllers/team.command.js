@@ -10,17 +10,54 @@ export const createTeam = async (req, res) => {
     const { team_name, description } = req.body;
     const created_by = req.user.id;
 
-    // Manual Transaction: Create Team -> Create Leader
-    const newTeam = await Team.create({ team_name, description, created_by });
-    createdTeam = newTeam; 
+    // ✅ Kiểm tra tên trùng trước khi tạo
+    const existingTeam = await Team.findOne({ 
+      team_name: team_name.trim() 
+    });
     
-    await TeamMember.create({ team_id: newTeam._id, user_id: created_by, role: 'leader' });
+    if (existingTeam) {
+      return res.status(400).json({ 
+        message: 'Tên nhóm đã tồn tại', 
+        field: 'team_name' 
+      });
+    }
 
-    res.status(201).json({ message: 'Tạo team thành công', team: newTeam });
+    // Manual Transaction: Create Team -> Create Leader
+    const newTeam = await Team.create({ 
+      team_name: team_name.trim(), 
+      description, 
+      created_by 
+    });
+    createdTeam = newTeam;
+    
+    await TeamMember.create({ 
+      team_id: newTeam._id, 
+      user_id: created_by, 
+      role: 'leader' 
+    });
+
+    res.status(201).json({ 
+      message: 'Tạo nhóm thành công', 
+      team: newTeam 
+    });
   } catch (error) {
     // Manual Rollback
-    if (createdTeam) await Team.findByIdAndDelete(createdTeam._id).catch(() => {});
-    res.status(500).json({ message: 'Lỗi tạo team', error: error.message });
+    if (createdTeam) {
+      await Team.findByIdAndDelete(createdTeam._id).catch(() => {});
+    }
+    
+    // ✅ Xử lý lỗi unique constraint từ MongoDB
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Tên nhóm đã tồn tại', 
+        field: 'team_name' 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Lỗi tạo nhóm', 
+      error: error.message 
+    });
   }
 };
 
@@ -158,22 +195,63 @@ export const updateTeam = async (req, res) => {
   try {
     const { id } = req.params;
     const { team_name, description } = req.body;
+    
     const team = await Team.findById(id);
     
-    if (!team) return res.status(404).json({ message: 'Not found' });
-    if (team.created_by.toString() !== req.user.id) return res.status(403).json({ message: 'No permission' });
+    if (!team) {
+      return res.status(404).json({ message: 'Không tìm thấy nhóm' });
+    }
+    
+    if (team.created_by.toString() !== req.user.id) {
+      return res.status(403).json({ message: 'Không có quyền chỉnh sửa' });
+    }
 
     const changes = {};
-    if (team_name && team_name !== team.team_name) changes.team_name = team_name;
-    if (description && description !== team.description) changes.description = description;
+    
+    // ✅ Kiểm tra tên trùng nếu có thay đổi tên
+    if (team_name && team_name.trim() !== team.team_name) {
+      const existingTeam = await Team.findOne({ 
+        team_name: team_name.trim(),
+        _id: { $ne: id } // Loại trừ chính nhóm đang sửa
+      });
+      
+      if (existingTeam) {
+        return res.status(400).json({ 
+          message: 'Tên nhóm đã tồn tại', 
+          field: 'team_name' 
+        });
+      }
+      
+      changes.team_name = team_name.trim();
+    }
+    
+    if (description !== undefined && description !== team.description) {
+      changes.description = description;
+    }
 
     if (Object.keys(changes).length > 0) {
       Object.assign(team, changes);
       await team.save();
     }
 
-    res.json({ message: 'Updated', team });
-  } catch (e) { res.status(500).json({ message: 'Server Error' }); }
+    res.json({ 
+      message: 'Cập nhật thành công', 
+      team 
+    });
+  } catch (error) {
+    // ✅ Xử lý lỗi unique constraint
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        message: 'Tên nhóm đã tồn tại', 
+        field: 'team_name' 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Lỗi server', 
+      error: error.message 
+    });
+  }
 };
 
 export const deleteTeam = async (req, res) => {

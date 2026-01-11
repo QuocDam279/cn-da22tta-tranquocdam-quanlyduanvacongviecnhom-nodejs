@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { MessageSquare, Layout, Clock, ChevronRight } from "lucide-react";
+import { MessageSquare, Layout, Clock } from "lucide-react";
 
 // Components
 import Header from "../components/common/Header";
@@ -138,11 +138,6 @@ export default function TaskDetail() {
                 </div>
               </div>
 
-            </div>
-
-            {/* Footer metadata */}
-            <div className="text-center text-xs text-gray-400 pt-4">
-                Task ID: {task._id}
             </div>
           </div>
         )}

@@ -8,7 +8,9 @@ import TeamList from "./TeamList";
 import { useMyTeams, useLeaderTeams } from "../../hooks/useTeams";
 
 export default function DashboardTeam() {
-  const [view, setView] = useState("grid");
+  // 👇 ĐÃ SỬA: Đổi "grid" thành "list" để mặc định hiển thị danh sách
+  const [view, setView] = useState("list");
+  
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // all | mine
   const [searchValue, setSearchValue] = useState("");

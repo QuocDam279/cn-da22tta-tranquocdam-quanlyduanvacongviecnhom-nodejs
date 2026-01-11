@@ -1,7 +1,6 @@
 import React, { useState, useMemo } from "react";
 import Header from "../components/common/Header";
 import OverviewCards from "../components/dashboard/OverviewCards";
-import Footer from "../components/common/Footer";
 import Calendar from "../components/dashboard/Calendar";
 import Status from "../components/dashboard/Status";
 import UpcomingTasks from "../components/dashboard/UpcomingTasks";
@@ -13,8 +12,9 @@ import { useDashboardData } from "../hooks/useDashboardData";
 /* ================= TAB CONFIG ================= */
 const TABS = [
   { key: "overview", label: "Tổng quan", icon: "📊" },
-  { key: "calendar", label: "Lịch", icon: "📅" },
+  { key: "projects", label: "Dự án", icon: "🚀" },
   { key: "tasks", label: "Công việc", icon: "✓" },
+  { key: "calendar", label: "Lịch", icon: "📅" },
 ];
 
 /* ================= DEADLINE LOGIC ================= */
@@ -66,7 +66,7 @@ export default function Dashboard() {
 
     return (
       <div className="space-y-8">
-        {/* ===== ROW 1: STATUS & DEADLINES (3 Columns) ===== */}
+        {/* ===== STATUS & DEADLINES (3 Columns) ===== */}
         <section>
           <div className="flex items-center gap-3 mb-6">
             <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-500 rounded-full"></div>
@@ -108,18 +108,6 @@ export default function Dashboard() {
             </div>
           </div>
         </section>
-
-        {/* ===== ROW 2: PROJECT LIST (Full Width) ===== */}
-        <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1 h-8 bg-gradient-to-b from-purple-500 to-pink-500 rounded-full"></div>
-            <h3 className="text-xl font-bold text-gray-800">Danh sách Dự án</h3>
-          </div>
-
-          <div className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden">
-            <Project />
-          </div>
-        </section>
       </div>
     );
   };
@@ -129,6 +117,13 @@ export default function Dashboard() {
     switch (activeTab) {
       case "overview":
         return renderOverviewTab();
+
+      case "projects":
+        return (
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            <Project />
+          </div>
+        );
 
       case "tasks":
         return (
@@ -202,9 +197,6 @@ export default function Dashboard() {
           </div>
         </div>
       </main>
-
-      {/* FOOTER - Luôn ở dưới cùng */}
-      <Footer />
     </div>
   );
 }

@@ -140,7 +140,6 @@ export default function TaskComments({ task, currentUser }) {
             )}
           </button>
         </form>
-        <p className="text-[9px] text-gray-400 mt-1 ml-1">Enter để gửi, Shift+Enter xuống dòng</p>
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 import React from "react";
 import Header from "../components/common/Header";
-import Footer from "../components/common/Footer";
 import DashboardTeam from "../components/team/DashboardTeam";
 
 export default function Team() {
@@ -13,9 +12,6 @@ export default function Team() {
       <main className="flex-1 pt-24 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
         <DashboardTeam />
       </main>
-
-      {/* FOOTER */}
-      <Footer />
     </div>
   );
 }

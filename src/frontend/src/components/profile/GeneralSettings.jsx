@@ -109,54 +109,6 @@ export default function GeneralSettings({ user }) {
               disabled
               className="w-full px-4 py-2.5 rounded-lg border border-slate-200 bg-slate-50 text-slate-500 text-sm cursor-not-allowed"
             />
-            <p className="text-xs text-slate-500 mt-1.5">Email không thể thay đổi</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Thông tin tài khoản */}
-      <div>
-        <h2 className="text-base font-semibold text-slate-900 mb-4">Thông tin tài khoản</h2>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Created At */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Calendar className="text-blue-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-slate-500 mb-0.5">Ngày tạo</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {new Date(user?.created_at).toLocaleDateString("vi-VN", {
-                    year: "numeric",
-                    month: "2-digit",
-                    day: "2-digit",
-                  })}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Last Login */}
-          <div className="p-4 rounded-lg border border-slate-200 bg-slate-50">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Clock className="text-emerald-600" size={20} />
-              </div>
-              <div className="min-w-0">
-                <p className="text-xs text-slate-500 mb-0.5">Đăng nhập lần cuối</p>
-                <p className="text-sm font-semibold text-slate-900">
-                  {user?.last_login
-                    ? new Date(user.last_login).toLocaleDateString("vi-VN", {
-                        year: "numeric",
-                        month: "2-digit",
-                        day: "2-digit",
-                      })
-                    : "Chưa có"}
-                </p>
-              </div>
-            </div>
           </div>
         </div>
       </div>

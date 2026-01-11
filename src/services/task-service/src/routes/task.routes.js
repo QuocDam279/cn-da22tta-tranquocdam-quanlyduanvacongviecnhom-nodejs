@@ -10,7 +10,8 @@ import {
   getTaskStatsByProject,
   getTaskStatsByUser,
   batchGetTasks,
-  getAllTasksInternal
+  getAllTasksInternal,
+  validateTasksDeadline  // ✅ THÊM MỚI
 } from '../controllers/task.query.js';
 
 // Import Command Controllers (Write)
@@ -36,6 +37,9 @@ router.get('/internal/all', getAllTasksInternal);
 router.get('/batch', batchGetTasks);
 router.get('/stats', verifyToken, getTaskStatsByUser);
 router.get('/stats/:projectId', verifyToken, getTaskStatsByProject);
+
+// ✅ VALIDATION ENDPOINT - Đặt TRƯỚC route :id để tránh conflict
+router.get('/validate-deadline/:id', verifyToken, validateTasksDeadline);
 
 // --- GENERAL READ ---
 router.get('/my', verifyToken, getMyTasks);

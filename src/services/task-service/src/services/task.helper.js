@@ -100,3 +100,50 @@ export const getUserNameFromRequest = (req) => {
   // 3. Fallback cuối cùng
   return 'Người dùng';
 };
+
+/**
+ * 🆕 Validate Due Date không vượt quá Project End Date
+ * 
+ * @param {string} project_id - ID của dự án
+ * @param {Date|string} due_date - Ngày hạn chót cần validate
+ * @param {string} authHeader - Authorization header
+ * @returns {Promise<{valid: boolean, message?: string}>}
+ */
+export const validateTaskDueDate = async (project_id, due_date, authHeader) => {
+  if (!due_date) return { valid: true };
+
+  try {
+    // Lấy thông tin project
+    const { data: response } = await http.project.get(`/${project_id}`, {
+      headers: { Authorization: authHeader }
+    });
+
+    const project = response?.data || response;
+    
+    if (!project.end_date) {
+      return { valid: true }; // Project không có end_date thì bỏ qua
+    }
+
+    const taskDueDate = new Date(due_date);
+    const projectEndDate = new Date(project.end_date);
+
+    // Kiểm tra date hợp lệ
+    if (isNaN(taskDueDate.getTime()) || isNaN(projectEndDate.getTime())) {
+      return { valid: true }; // Nếu date không hợp lệ, bỏ qua validation
+    }
+
+    // So sánh ngày
+    if (taskDueDate > projectEndDate) {
+      return {
+        valid: false,
+        message: `Hạn chót công việc (${taskDueDate.toLocaleDateString('vi-VN')}) không được vượt quá hạn dự án (${projectEndDate.toLocaleDateString('vi-VN')})`
+      };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    console.warn(`[Helper] Validate due date error:`, error.message);
+    // Fallback: cho phép tạo/update nếu không lấy được thông tin project
+    return { valid: true };
+  }
+};
